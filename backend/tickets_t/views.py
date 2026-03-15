@@ -2,6 +2,10 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from .models import Ticket
 from .serializers import TicketSerializer, TicketCreateSerializer
+from .serializers import TicketMessageSerializer
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 def role(user):
     return getattr(user, "role", None)
@@ -23,3 +27,12 @@ class TicketViewSet(viewsets.ModelViewSet):
         if self.action == "create":
             return TicketCreateSerializer
         return TicketSerializer
+
+class TicketViewSet(viewsets.ModelViewSet):
+    # ... tu código actual ...
+
+    @action(detail=True, methods=["get"])
+    def messages(self, request, pk=None):
+        ticket = self.get_object()  # respeta permisos/get_queryset
+        qs = TicketMessage.objects.filter(ticket=ticket).order_by("created_at")
+        return Response(TicketMessageSerializer(qs, many=True).data)

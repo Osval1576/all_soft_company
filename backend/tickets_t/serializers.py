@@ -2,6 +2,7 @@ from datetime import datetime
 from django.db import transaction
 from rest_framework import serializers
 from .models import Ticket
+from .models import TicketMessage
 
 def role(user):
     return getattr(user, "role", None)
@@ -82,3 +83,30 @@ class TicketCreateSerializer(serializers.ModelSerializer):
         validated_data["reference"] = f"{prefix}{next_num:06d}"
         validated_data["creado_por"] = request.user
         return super().create(validated_data)
+    
+
+
+
+class TicketMessageSerializer(serializers.ModelSerializer):
+    sender_username = serializers.CharField(source="sender.username", read_only=True)
+    sender_role = serializers.CharField(source="sender.role", read_only=True)
+
+    class Meta:
+        model = TicketMessage
+        fields = [
+            "id",
+            "ticket",
+            "sender",
+            "sender_username",
+            "sender_role",
+            "content",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "ticket",
+            "sender",
+            "sender_username",
+            "sender_role",
+            "created_at",
+        ]

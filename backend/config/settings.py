@@ -133,7 +133,7 @@ CORS_ALLOW_HEADERS = [
 # -----------------------
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "config.authentication.CookieJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
@@ -147,3 +147,21 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+]
+
+CORS_ALLOW_CREDENTIALS = True  # clave para enviar cookies al frontend
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+]
+
+# En dev (HTTP) lo más estable es Lax.
+# Si pones SameSite=None, muchos browsers exigen Secure=True (HTTPS) y en local te puede fallar.
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+
+# Recomendado para que el navegador mande cookies en cross-origin fetch:
+CSRF_COOKIE_HTTPONLY = False  # el token csrf (si lo usas) suele necesitar leerse en JS
