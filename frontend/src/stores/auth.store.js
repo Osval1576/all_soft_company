@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { me } from "../api/auth.api";
+import { http } from "../api/http";
 import router from "../router";
 
 export const useAuthStore = defineStore("auth", {
@@ -7,21 +7,41 @@ export const useAuthStore = defineStore("auth", {
     user: null,
     loaded: false,
   }),
+
   actions: {
     async loadMe() {
       try {
-        this.user = await me();
+        const res = await http.get("/api/me/");
+        this.user = res.data;
       } catch {
         this.user = null;
       } finally {
         this.loaded = true;
       }
     },
+
     redirectByRole() {
-      const role = this.user?.role;
-      if (role === "ADMIN") return { name: "admin" };
-      if (role === "AGENT") return { name: "tecnico" };
+      const r = this.user?.role;
+      if (r === "ADMIN") return { name: "admin" };
+      if (r === "AGENT") return { name: "tecnico-inbox" };
       return { name: "cliente" };
+    },
+
+    async login(username, password) {
+      await http.post("/api/auth/login-cookie/", { username, password });
+      this.loaded = false;
+      await this.loadMe();
+      return router.push(this.redirectByRole());
+    },
+
+    async logout() {
+      try {
+        await http.post("/api/auth/logout/");
+      } finally {
+        this.user = null;
+        this.loaded = true;
+        router.push({ name: "login" });
+      }
     },
   },
 });
