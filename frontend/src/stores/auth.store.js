@@ -10,22 +10,21 @@ export const useAuthStore = defineStore("auth", {
 
   actions: {
     async loadMe() {
-      try {
-        const res = await http.get("/api/me/");
-        this.user = res.data;
-      } catch {
-        this.user = null;
-      } finally {
-        this.loaded = true;
-      }
-    },
+  try {
+    const res = await http.get("/api/me/");
+    this.user = res.data;
+  } catch (e) {
+    this.user = null;   // importante
+  } finally {
+    this.loaded = true; // importante
+  }
+},
 
-    redirectByRole() {
-      const r = this.user?.role;
-      if (r === "ADMIN") return { name: "admin" };
-      if (r === "AGENT") return { name: "tecnico-inbox" };
-      return { name: "cliente" };
-    },
+redirectByRole() {
+  if (this.user?.is_superuser) return { name: "admin" };
+  if (this.user?.is_staff) return { name: "tecnico-inbox" };
+  return { name: "cliente" };
+},
 
     async login(username, password) {
       await http.post("/api/auth/login-cookie/", { username, password });

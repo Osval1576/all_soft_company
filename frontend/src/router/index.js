@@ -4,26 +4,29 @@ import LoginView from "../views/LoginView.vue";
 import ClientDashboard from "../views/dashboards/ClientDashboard.vue";
 import TechnicianDashboard from "../views/dashboards/TechnicianDashboard.vue";
 import AdminDashboard from "../views/dashboards/AdminDashboard.vue";
-
 import TechnicianInboxView from "../views/dashboards/TechnicianInboxView.vue";
 
 import { useAuthStore } from "../stores/auth.store";
 
+const routes = [
+  { path: "/login", name: "login", component: LoginView },
+
+  // CUSTOMER: usuario normal (no staff, no superuser)
+  { path: "/cliente", name: "cliente", component: ClientDashboard, meta: { role: "CUSTOMER" } },
+
+  // AGENT: staff (soporte/técnico)
+  { path: "/tecnico", name: "tecnico", component: TechnicianDashboard, meta: { role: "AGENT" } },
+  { path: "/tecnico/inbox", name: "tecnico-inbox", component: TechnicianInboxView, meta: { role: "AGENT" } },
+
+  // ADMIN: superuser
+  { path: "/admin", name: "admin", component: AdminDashboard, meta: { role: "ADMIN" } },
+
+  { path: "/", redirect: "/login" },
+];
+
 const router = createRouter({
   history: createWebHistory(),
-  routes: [
-    { path: "/login", name: "login", component: LoginView },
-
-    { path: "/cliente", name: "cliente", component: ClientDashboard, meta: { role: "CUSTOMER" } },
-
-    // dashboard técnico + inbox chat
-    { path: "/tecnico", name: "tecnico", component: TechnicianDashboard, meta: { role: "AGENT" } },
-    { path: "/tecnico/inbox", name: "tecnico-inbox", component: TechnicianInboxView, meta: { role: "AGENT" } },
-
-    { path: "/admin", name: "admin", component: AdminDashboard, meta: { role: "ADMIN" } },
-
-    { path: "/", redirect: "/login" },
-  ],
+  routes,
 });
 
 router.beforeEach(async (to) => {
@@ -32,12 +35,16 @@ router.beforeEach(async (to) => {
   if (to.name === "login") return true;
 
   if (!auth.loaded) {
-    await auth.loadMe(); // GET /api/me/ con cookie
+    await auth.loadMe();
   }
 
   if (!auth.user) return { name: "login" };
 
-  if (to.meta?.role && auth.user.role !== to.meta.role) {
+  const required = to.meta?.role;
+
+  if (required === "ADMIN" && !auth.user.is_superuser) return auth.redirectByRole();
+  if (required === "AGENT" && !auth.user.is_staff) return auth.redirectByRole();
+  if (required === "CUSTOMER" && (auth.user.is_staff || auth.user.is_superuser)) {
     return auth.redirectByRole();
   }
 

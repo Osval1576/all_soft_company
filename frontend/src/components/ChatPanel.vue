@@ -45,7 +45,7 @@ const ws = ref(null);
 const messagesEl = ref(null);
 
 function wsUrl(ticketId) {
-  return `ws://127.0.0.1:8000/ws/chat/${ticketId}/`;
+  return `ws://localhost:8000/ws/chat/${ticketId}/`;
 }
 
 function scrollToBottom() {
