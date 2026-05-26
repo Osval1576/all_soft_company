@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "users",
     "tickets_t",
+    "channels",
 
     # Local apps (descomenta cuando existan)
     # "accounts",
@@ -73,6 +74,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = "config.asgi.application"
 
 # Database (MySQL)
 DATABASES = {
@@ -86,6 +88,12 @@ DATABASES = {
         "OPTIONS": {
             "charset": "utf8mb4",
         },
+    }
+}
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
     }
 }
 
