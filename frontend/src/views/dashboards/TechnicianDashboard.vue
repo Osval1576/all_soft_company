@@ -2,5 +2,5 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
-useRouter().replace({ name: 'tecnico-inbox' })
+    useRouter().replace({ name: 'tecnico-inbox' })
 </script>

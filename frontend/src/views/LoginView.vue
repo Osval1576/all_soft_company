@@ -9,7 +9,7 @@
         </div>
       </div>
 
-      <form @submit.prevent="onSubmit" class="login-form">
+        <form @submit.prevent="onSubmit" class="login-form">
         <div class="field">
           <label class="label">Usuario</label>
           <input v-model="username" placeholder="nombre de usuario" class="input" autocomplete="username" />
@@ -20,10 +20,10 @@
           <input v-model="password" type="password" placeholder="••••••••" class="input" autocomplete="current-password" />
         </div>
 
-        <div v-if="error" class="error-msg">{{ error }}</div>
+          <div v-if="error" class="error-msg">{{ error }}</div>
 
         <button type="submit" :disabled="loading" class="btn-submit">
-          {{ loading ? "Iniciando sesión..." : "Iniciar sesión" }}
+            {{ loading ? "Iniciando sesión..." : "Iniciar sesión" }}
         </button>
       </form>
     </div>
