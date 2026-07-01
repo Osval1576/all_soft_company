@@ -28,3 +28,8 @@ class ValidateImageFileTests(TestCase):
         f = SimpleUploadedFile("big.png", big, content_type="image/png")
         with self.assertRaises(ValidationError):
             validate_image_file(f)
+
+    def test_rejects_corrupt_image(self):
+        f = SimpleUploadedFile("corrupt.png", b"\x89PNG\r\n\x1a\nGARBAGE_NOT_A_REAL_PNG", content_type="image/png")
+        with self.assertRaises(ValidationError):
+            validate_image_file(f)

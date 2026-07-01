@@ -11,9 +11,8 @@ def validate_image_file(file):
     if getattr(file, "content_type", None) not in ALLOWED_CONTENT_TYPES:
         raise ValidationError("Tipo de archivo no permitido (usa jpg, png o webp).")
     try:
-        img = Image.open(file)
-        img.verify()
-    except (UnidentifiedImageError, Exception):
+        Image.open(file).verify()
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError):
         raise ValidationError("El archivo no es una imagen válida.")
     finally:
         file.seek(0)
