@@ -57,8 +57,17 @@ class _OrderedAdminViewSet(viewsets.ModelViewSet):
         ids = request.data.get("ids", [])
         if not isinstance(ids, list):
             return Response({"detail": "ids must be a list"}, status=400)
+        existing = set(self.get_queryset().values_list("pk", flat=True))
+        submitted = set(ids)
+        if submitted != existing:
+            return Response(
+                {"detail": "ids must be the exact set of existing rows",
+                 "missing": list(existing - submitted),
+                 "unknown": list(submitted - existing)},
+                status=400,
+            )
         for idx, pk in enumerate(ids):
-            self.queryset.filter(pk=pk).update(order=idx)
+            self.get_queryset().filter(pk=pk).update(order=idx)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
