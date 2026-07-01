@@ -31,6 +31,7 @@ urlpatterns = [
     path("api/me/", me, name="me"),
 
     path("api/users/", include("users.urls")),
+    path("api/public/", include("landing_cms.public_urls")),
     path("api/", include("tickets_t.urls")),
     path("api/auth/login-cookie/", LoginCookieView.as_view(), name="login_cookie"),
     path("api/auth/refresh-cookie/", RefreshCookieView.as_view(), name="refresh_cookie"),
