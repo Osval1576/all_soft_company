@@ -13,13 +13,14 @@ export function useScrollReveal(getEl) {
     if (reduced) return;
     const el = typeof getEl === "function" ? getEl() : getEl;
     if (!el) return;
-    gsap.from(el, {
+    const anim = gsap.from(el, {
       opacity: 0,
       y: 24,
       duration: 0.6,
       ease: "power2.out",
       scrollTrigger: { trigger: el, start: "top 85%" },
     });
+    st = anim.scrollTrigger;
   });
 
   onBeforeUnmount(() => st && st.kill());
