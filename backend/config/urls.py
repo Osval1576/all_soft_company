@@ -21,6 +21,9 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import me
 from .auth_views import LoginCookieView, RefreshCookieView, LogoutView
+from landing_cms.admin_views import SiteSettingsAdminView
+
+v_settings_admin = SiteSettingsAdminView.as_view()
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -32,6 +35,8 @@ urlpatterns = [
 
     path("api/users/", include("users.urls")),
     path("api/public/", include("landing_cms.public_urls")),
+    path("api/admin/landing/", include("landing_cms.admin_urls")),
+    path("api/admin/site-settings/", v_settings_admin),
     path("api/", include("tickets_t.urls")),
     path("api/auth/login-cookie/", LoginCookieView.as_view(), name="login_cookie"),
     path("api/auth/refresh-cookie/", RefreshCookieView.as_view(), name="refresh_cookie"),
