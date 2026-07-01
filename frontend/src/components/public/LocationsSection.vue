@@ -16,7 +16,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { Loader } from "@googlemaps/js-api-loader";
 import { useScrollReveal } from "../../composables/useScrollReveal";
 
@@ -34,6 +34,15 @@ const apiKey = computed(() => props.settings?.google_maps_api_key || "");
 let mapInstance = null;
 let markers = [];
 
+function cleanup() {
+  markers.forEach(m => m.setMap(null));
+  markers = [];
+  if (mapInstance && window.google?.maps?.event) {
+    window.google.maps.event.clearInstanceListeners(mapInstance);
+  }
+  mapInstance = null;
+}
+
 async function initMap() {
   if (!apiKey.value || !mapEl.value) return;
   const loader = new Loader({ apiKey: apiKey.value, version: "weekly", libraries: ["maps", "marker"] });
@@ -43,9 +52,10 @@ async function initMap() {
   const center = props.locations[0]
     ? { lat: Number(props.locations[0].lat), lng: Number(props.locations[0].lng) }
     : { lat: 19.4326, lng: -99.1332 };
+
+  cleanup();
   mapInstance = new Map(mapEl.value, { center, zoom: 12, mapTypeControl: false });
 
-  markers.forEach(m => m.setMap(null));
   markers = props.locations.map(l => {
     const marker = new Marker({
       position: { lat: Number(l.lat), lng: Number(l.lng) },
@@ -67,6 +77,7 @@ function focus(l) {
 
 onMounted(() => { if (apiKey.value && props.locations.length) initMap(); });
 watch(() => [apiKey.value, props.locations.length], () => initMap());
+onBeforeUnmount(cleanup);
 </script>
 
 <style scoped>
