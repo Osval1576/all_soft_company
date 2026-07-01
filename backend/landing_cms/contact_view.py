@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -50,7 +50,10 @@ class ContactView(APIView):
                 role="CUSTOMER",
             )
             user.set_unusable_password()
-            user.save()
+            try:
+                user.save()
+            except IntegrityError:
+                user = User.objects.get(email=data["email"])
 
         ticket = Ticket.objects.create(
             reference=_next_reference(),
