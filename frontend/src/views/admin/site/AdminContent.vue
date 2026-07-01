@@ -14,10 +14,13 @@
       <header><h2>Sobre nosotros</h2><button @click="saveAbout" :disabled="busy.about">Guardar</button></header>
       <I18nField label="Misión" type="textarea" v-model:es="about.mission_es" v-model:en="about.mission_en" />
       <I18nField label="Visión" type="textarea" v-model:es="about.vision_es" v-model:en="about.vision_en" />
+      <I18nField label="Valores" type="textarea" v-model:es="about.values_es" v-model:en="about.values_en" />
     </section>
 
     <section class="block">
       <header><h2>Site settings</h2><button @click="saveSettings" :disabled="busy.settings">Guardar</button></header>
+      <label>Logo del sitio</label>
+      <ImageDrop v-model:file="logoFile" :existingUrl="settings.logo" />
       <label>Google Maps API key <input v-model="settings.google_maps_api_key" /></label>
       <I18nField label="Pie de página" type="textarea" v-model:es="settings.footer_text_es" v-model:en="settings.footer_text_en" />
     </section>
@@ -39,11 +42,13 @@ import { landingAdminApi } from "../../../api/landing.api";
 import I18nField from "../../../components/admin/site/I18nField.vue";
 import DragHandleList from "../../../components/admin/site/DragHandleList.vue";
 import FeatureFormRow from "../../../components/admin/site/FeatureFormRow.vue";
+import ImageDrop from "../../../components/admin/site/ImageDrop.vue";
 
 const hero = reactive({});
 const about = reactive({});
 const settings = reactive({});
 const features = ref([]);
+const logoFile = ref(null);
 const busy = reactive({ hero: false, about: false, settings: false });
 const msg = ref("");
 
@@ -64,10 +69,12 @@ async function saveSettings() {
   busy.settings = true;
   const fd = new FormData();
   Object.entries(settings).forEach(([k, v]) => {
+    if (k === "logo") return;                       // never send the string URL as logo
     if (v === null || v === undefined) return;
     if (typeof v === "object") fd.append(k, JSON.stringify(v));
     else fd.append(k, v);
   });
+  if (logoFile.value) fd.append("logo", logoFile.value);
   try { await landingAdminApi.putSettings(fd); toast("Ajustes guardados"); }
   finally { busy.settings = false; }
 }

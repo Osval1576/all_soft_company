@@ -10,6 +10,10 @@
         <h3>Visión</h3>
         <p>{{ pick(about, "vision") }}</p>
       </div>
+      <div v-if="pick(about, 'values')" class="card">
+        <h3>Valores</h3>
+        <p>{{ pick(about, "values") }}</p>
+      </div>
     </div>
     <div v-if="team.length" class="team">
       <article v-for="m in team" :key="m.id" class="member">
