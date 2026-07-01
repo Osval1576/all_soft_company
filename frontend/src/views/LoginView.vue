@@ -1,14 +1,6 @@
 <template>
   <div class="login-page">
     <div class="login-card">
-      <div class="login-brand">
-        <div class="brand-mark">AS</div>
-        <div class="brand-text">
-          <span class="brand-name">AllSafe</span>
-          <span class="brand-sub">Portal de soporte</span>
-        </div>
-      </div>
-
         <form @submit.prevent="onSubmit" class="login-form">
         <div class="field">
           <label class="label">Usuario</label>
@@ -84,29 +76,6 @@ async function onSubmit() {
   padding: 36px 32px;
   box-shadow: var(--shadow-md);
 }
-.login-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 32px;
-}
-.brand-mark {
-  width: 44px;
-  height: 44px;
-  background: var(--accent);
-  color: var(--accent-fg);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: .5px;
-  flex-shrink: 0;
-}
-.brand-text { display: flex; flex-direction: column; gap: 2px; }
-.brand-name { font-size: 18px; font-weight: 700; color: var(--text); line-height: 1.2; }
-.brand-sub  { font-size: 12px; color: var(--text-3); }
 .login-form { display: flex; flex-direction: column; gap: 16px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .label { font-size: 12px; font-weight: 600; color: var(--text-2); letter-spacing: .3px; }
