@@ -14,11 +14,16 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import me
 from .auth_views import LoginCookieView, RefreshCookieView, LogoutView
+from landing_cms.admin_views import SiteSettingsAdminView
+
+v_settings_admin = SiteSettingsAdminView.as_view()
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -29,10 +34,15 @@ urlpatterns = [
     path("api/me/", me, name="me"),
 
     path("api/users/", include("users.urls")),
+    path("api/public/", include("landing_cms.public_urls")),
+    path("api/admin/landing/", include("landing_cms.admin_urls")),
+    path("api/admin/site-settings/", v_settings_admin),
     path("api/", include("tickets_t.urls")),
     path("api/auth/login-cookie/", LoginCookieView.as_view(), name="login_cookie"),
     path("api/auth/refresh-cookie/", RefreshCookieView.as_view(), name="refresh_cookie"),
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),
 ]
 
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

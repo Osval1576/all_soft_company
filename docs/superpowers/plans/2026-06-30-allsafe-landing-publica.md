@@ -13,7 +13,7 @@
 - Backend: Django 6.0.3, Python 3.x, MySQL 8 (utf8mb4), DRF default auth = `CookieJWTAuthentication`. New endpoints must explicitly set `permission_classes` (public = `[AllowAny]`, admin = `[IsAdminRole]`).
 - i18n strategy: paired `_es` / `_en` fields on the same model. Both languages always returned; frontend picks via locale store.
 - File uploads: `MEDIA_ROOT = BASE_DIR / "media"`, `MEDIA_URL = "/media/"`. Validation: Pillow `Image.verify()` + size ≤ 2 MB + content-type in `{jpeg, png, webp}`.
-- Throttling on `POST /api/public/contact/`: 5/hour per IP via DRF `AnonRateThrottle`.
+- Throttling on `POST /api/public/contact/`: 5/hour per IP via a scoped DRF `ScopedRateThrottle` (scope `"contact"`). Applied **only** at the view level — must NOT be set as `DEFAULT_THROTTLE_CLASSES` (that would throttle the public GETs too and break the landing after one visit).
 - Singleton pattern: `pk=1` enforced in `save()`; helper `cls.load()` returns the unique row, creating it if missing.
 - Frontend: keep current Vite 8 / Vue 3.5 / Pinia / Vue Router. No bundler swap. No SSR.
 - Naming: app folder `landing_cms`. URL prefixes `/api/public/` and `/api/admin/landing/`. Vue routes `/`, `/admin/sitio/contenido`, `/admin/sitio/equipo`, `/admin/sitio/ubicaciones`.
@@ -162,7 +162,8 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 ```
 
-In the `REST_FRAMEWORK` dict (currently at the bottom) add the throttling keys:
+In the `REST_FRAMEWORK` dict (currently at the bottom) add ONLY a `DEFAULT_THROTTLE_RATES` entry for the scope used by the contact endpoint — do NOT add `DEFAULT_THROTTLE_CLASSES`, that would throttle every anonymous request including the landing's public GETs. The contact view itself declares the scoped throttle in Task 10.
+
 ```python
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -171,11 +172,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
-    "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.AnonRateThrottle",
-    ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "5/hour",
+        "contact": "5/hour",
     },
 }
 ```
@@ -1325,8 +1323,13 @@ def _next_reference():
     return f"{prefix}{n:06d}"
 
 
+from rest_framework.throttling import ScopedRateThrottle
+
+
 class ContactView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "contact"
 
     @transaction.atomic
     def post(self, request):

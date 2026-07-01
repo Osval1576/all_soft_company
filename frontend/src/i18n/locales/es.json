@@ -1,0 +1,10 @@
+{
+  "nav": { "features": "Funcionalidades", "about": "Nosotros", "locations": "Ubicaciones", "contact": "Contacto", "signin": "Iniciar sesión" },
+  "contact": {
+    "title": "Contáctanos",
+    "name": "Nombre", "email": "Email", "subject": "Asunto", "message": "Mensaje",
+    "send": "Enviar mensaje", "success": "Recibimos tu mensaje. Referencia: {ref}",
+    "error": "No se pudo enviar. Intenta de nuevo."
+  },
+  "loading": "Cargando..."
+}

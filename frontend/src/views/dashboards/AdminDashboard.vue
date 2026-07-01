@@ -10,6 +10,12 @@
         <div class="stat-card stat-card--users"><span class="stat-value">{{ users.length }}</span><span class="stat-label">Usuarios</span></div>
       </div>
 
+      <section style="display:flex; gap:12px; margin-bottom:24px;">
+        <router-link to="/admin/sitio/contenido" class="cms-link">Contenido del sitio</router-link>
+        <router-link to="/admin/sitio/equipo" class="cms-link">Equipo</router-link>
+        <router-link to="/admin/sitio/ubicaciones" class="cms-link">Ubicaciones</router-link>
+      </section>
+
       <div class="tabs">
         <button v-for="tab in TABS" :key="tab.id" class="tab-btn" :class="{ 'tab-btn--active': activeTab === tab.id }" @click="activeTab = tab.id">{{ tab.label }}</button>
       </div>
@@ -192,6 +198,8 @@ onMounted(loadAll);
 
 <style scoped>
 .page { display: flex; flex-direction: column; height: 100%; }
+.cms-link { padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--r); color: var(--text); text-decoration: none; font-size: 13px; font-weight: 600; }
+.cms-link:hover { background: var(--surface-2); }
 .content { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 16px 20px; gap: 16px; overflow-y: auto; }
 .stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; flex-shrink: 0; }
 .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 18px; display: flex; flex-direction: column; gap: 4px; box-shadow: var(--shadow-sm); }
