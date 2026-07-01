@@ -12,6 +12,7 @@ __pycache__/
 venv/
 env/
 backend/python/
+backend/python
 
 # Django runtime
 db.sqlite3
@@ -25,6 +26,7 @@ local_settings.py
 # ------------------------------------------------------------
 node_modules/
 frontend/npm/
+frontend/npm
 dist/
 dist-ssr/
 .vite/
