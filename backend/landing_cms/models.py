@@ -50,3 +50,64 @@ class SiteSettings(_SingletonBase):
     footer_text_en = models.TextField(blank=True)
     social_links = models.JSONField(default=dict, blank=True)
     google_maps_api_key = models.CharField(max_length=100, blank=True)
+
+
+class _Ordered(models.Model):
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        abstract = True
+        ordering = ["order", "pk"]
+
+
+class Feature(_Ordered):
+    icon = models.CharField(max_length=50)
+    title_es = models.CharField(max_length=100)
+    title_en = models.CharField(max_length=100)
+    description_es = models.TextField(blank=True)
+    description_en = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.title_es or self.title_en
+
+
+class TeamMember(_Ordered):
+    photo = models.ImageField(
+        upload_to="team/", blank=True, null=True,
+        validators=[validate_image_file],
+    )
+    name = models.CharField(max_length=100)
+    role_es = models.CharField(max_length=100, blank=True)
+    role_en = models.CharField(max_length=100, blank=True)
+    bio_es = models.TextField(blank=True)
+    bio_en = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Location(_Ordered):
+    class Type(models.TextChoices):
+        SUCURSAL = "SUCURSAL", "Sucursal"
+        OFICINA = "OFICINA", "Oficina"
+        CENTRO = "CENTRO", "Centro de servicio"
+
+    name = models.CharField(max_length=100)
+    address = models.CharField(max_length=255)
+    lat = models.DecimalField(max_digits=9, decimal_places=6)
+    lng = models.DecimalField(max_digits=9, decimal_places=6)
+    phone = models.CharField(max_length=50, blank=True)
+    email = models.EmailField(blank=True)
+    hours_es = models.CharField(max_length=200, blank=True)
+    hours_en = models.CharField(max_length=200, blank=True)
+    photo = models.ImageField(
+        upload_to="locations/", blank=True, null=True,
+        validators=[validate_image_file],
+    )
+    description_es = models.TextField(blank=True)
+    description_en = models.TextField(blank=True)
+    type = models.CharField(max_length=20, choices=Type.choices, default=Type.OFICINA)
+
+    def __str__(self):
+        return self.name
