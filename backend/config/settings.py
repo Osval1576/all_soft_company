@@ -34,6 +34,8 @@ INSTALLED_APPS = [
     "users",
     "tickets_t",
     "channels",
+    "landing_cms",
+    "django_cleanup.apps.CleanupConfig",
 
     # Local apps (descomenta cuando existan)
     # "accounts",
@@ -114,6 +116,9 @@ USE_TZ = True
 # Static files
 STATIC_URL = "static/"
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # -----------------------
@@ -146,6 +151,9 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_THROTTLE_RATES": {
+        "contact": "5/hour",
+    },
 }
 
 SIMPLE_JWT = {
