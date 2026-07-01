@@ -1,7 +1,6 @@
-from datetime import datetime
-
 from django.contrib.auth import get_user_model
 from django.db import transaction, IntegrityError
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -16,7 +15,7 @@ User = get_user_model()
 
 
 def _next_reference():
-    prefix = "ALS-" + datetime.utcnow().strftime("%Y%m%d") + "-"
+    prefix = "ALS-" + timezone.now().strftime("%Y%m%d") + "-"
     last = (
         Ticket.objects.select_for_update()
         .filter(reference__startswith=prefix)
@@ -53,16 +52,27 @@ class ContactView(APIView):
             try:
                 user.save()
             except IntegrityError:
-                user = User.objects.get(email=data["email"])
+                user = User.objects.get(username=data["email"])
 
-        ticket = Ticket.objects.create(
-            reference=_next_reference(),
-            titulo=data["subject"],
-            descripcion=data["message"],
-            prioridad="MEDIUM",
-            estado="OPEN",
-            creado_por=user,
-        )
+        for attempt in range(3):
+            try:
+                with transaction.atomic():
+                    ticket = Ticket.objects.create(
+                        reference=_next_reference(),
+                        titulo=data["subject"],
+                        descripcion=data["message"],
+                        prioridad="MEDIUM",
+                        estado="OPEN",
+                        creado_por=user,
+                    )
+                break
+            except IntegrityError:
+                if attempt == 2:
+                    raise
+                continue
+        else:
+            raise IntegrityError("could not allocate ticket reference after 3 attempts")
+
         TicketMessage.objects.create(
             ticket=ticket, sender=user, content=data["message"],
         )

@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -49,3 +51,35 @@ class ContactEndpointTests(TestCase):
     def test_validation_error(self):
         r = self.client.post(self.url, {"name": "Ana"}, format="json")
         self.assertEqual(r.status_code, 400)
+
+    def test_reference_collision_retries(self):
+        from landing_cms import contact_view
+        real_ref = contact_view._next_reference
+
+        # Pre-create a ticket so we know a valid reference to collide with.
+        pre_user = User.objects.create_user(username="pre", email="pre@x.com", role="CUSTOMER")
+        first_ref = real_ref()
+        Ticket.objects.create(
+            reference=first_ref,
+            titulo="pre", descripcion="pre", prioridad="MEDIUM", estado="OPEN",
+            creado_por=pre_user,
+        )
+
+        calls = {"n": 0}
+
+        def flaky():
+            calls["n"] += 1
+            if calls["n"] == 1:
+                # Force a collision on the first attempt.
+                return first_ref
+            return real_ref()
+
+        with patch.object(contact_view, "_next_reference", side_effect=flaky):
+            r = self.client.post(self.url, {
+                "name": "A", "email": "a@x.com",
+                "subject": "S", "message": "M",
+            }, format="json")
+
+        self.assertEqual(r.status_code, 201)
+        self.assertGreaterEqual(calls["n"], 2)
+        self.assertNotEqual(r.json()["ticket_reference"], first_ref)
