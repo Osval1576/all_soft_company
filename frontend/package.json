@@ -17,7 +17,7 @@
     "vue": "^3.5.25",
     "vue-i18n": "^9.14.5",
     "vue-router": "^5.0.3",
-    "vuedraggable": "^2.24.3"
+    "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.2",
