@@ -3,6 +3,7 @@ from django.db import transaction
 from rest_framework import serializers
 from .models import Ticket
 from .models import TicketMessage
+from .models import TicketEvent
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -26,6 +27,15 @@ class TicketSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "reference", "creado_por", "created_at"]
+
+    def validate_asignado_a(self, value):
+        if value is None:
+            return value
+        if not (value.is_superuser or getattr(value, "role", None) == "AGENT"):
+            raise serializers.ValidationError(
+                "Solo se puede asignar a técnicos (rol AGENT)."
+            )
+        return value
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -113,3 +123,11 @@ class TicketMessageSerializer(serializers.ModelSerializer):
             "sender_role",
             "created_at",
         ]
+
+
+class TicketEventSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source="actor.username", read_only=True, default=None)
+
+    class Meta:
+        model = TicketEvent
+        fields = ["id", "kind", "actor", "actor_username", "payload", "created_at"]
