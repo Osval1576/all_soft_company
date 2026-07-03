@@ -65,3 +65,34 @@ class TicketMessage(models.Model):
         ordering = ["created_at"]
 
 
+class TicketEvent(models.Model):
+    class Kind(models.TextChoices):
+        CREATED = "created", "Creado"
+        ASSIGNED = "assigned", "Asignado"
+        UNASSIGNED = "unassigned", "Desasignado"
+        STATUS_CHANGED = "status_changed", "Cambio de estado"
+        REOPENED = "reopened", "Reabierto"
+        PRIORITY_CHANGED = "priority_changed", "Cambio de prioridad"
+
+    ticket = models.ForeignKey(
+        "Ticket",
+        on_delete=models.CASCADE,
+        related_name="events",
+    )
+    kind = models.CharField(max_length=32, choices=Kind.choices)
+    actor = models.ForeignKey(
+        "users.User",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="+",
+    )
+    payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [models.Index(fields=["ticket", "created_at"])]
+
+    def __str__(self):
+        return f"{self.kind}@{self.ticket_id} by {self.actor_id}"
+
