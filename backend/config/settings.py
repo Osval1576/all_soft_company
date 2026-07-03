@@ -163,6 +163,14 @@ REST_FRAMEWORK = {
     },
 }
 
+# Cache (presence de notificaciones). LocMem hoy; Redis en sub-proyecto G.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "allsafe-default",
+    }
+}
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),

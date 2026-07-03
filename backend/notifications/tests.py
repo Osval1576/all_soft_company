@@ -2,6 +2,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from tickets_t.models import Ticket
 from notifications.models import Notification, NotificationPreference
+from notifications.presence import mark_online, is_online, mark_offline
 
 User = get_user_model()
 
@@ -34,3 +35,12 @@ class ModelTests(TestCase):
         b = NotificationPreference.for_user(self.customer)
         self.assertEqual(a.pk, b.pk)
         self.assertEqual(NotificationPreference.objects.count(), 1)
+
+
+class PresenceTests(TestCase):
+    def test_online_lifecycle(self):
+        self.assertFalse(is_online(999))
+        mark_online(999)
+        self.assertTrue(is_online(999))
+        mark_offline(999)
+        self.assertFalse(is_online(999))
