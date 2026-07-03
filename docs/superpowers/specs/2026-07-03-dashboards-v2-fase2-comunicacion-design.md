@@ -80,7 +80,9 @@ Modelos:
 Notification
   recipient   FK users.User (related_name="notifications", on_delete CASCADE)
   kind        CharField choices: ticket_created | assigned | new_message
-                                 | status_changed | resolved
+                                 | status_changed
+              # status_changed cubre el aviso al cliente en RESOLVED/CLOSED;
+              # el detalle de la transición va en title/body.
   ticket      FK tickets_t.Ticket (null=True, on_delete SET_NULL)   # deep-link
   actor       FK users.User (null=True, on_delete SET_NULL, related_name="+")
   title       CharField(200)   # texto ya renderizado (voseo)
