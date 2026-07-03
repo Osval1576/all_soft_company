@@ -32,8 +32,9 @@ class TicketSerializer(serializers.ModelSerializer):
             "creado_por",
             "asignado_a",
             "created_at",
+            "updated_at",
         ]
-        read_only_fields = ["id", "reference", "creado_por", "created_at"]
+        read_only_fields = ["id", "reference", "creado_por", "created_at", "updated_at"]
 
     def validate_asignado_a(self, value):
         if value is None:

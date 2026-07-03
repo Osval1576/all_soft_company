@@ -49,6 +49,7 @@ class Ticket(models.Model):
     )
 
     created_at = models.DateTimeField(default=timezone.now, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.reference} - {self.titulo}"
