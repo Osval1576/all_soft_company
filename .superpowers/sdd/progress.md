@@ -50,3 +50,15 @@ Plan: docs/superpowers/plans/2026-07-01-dashboards-v2-fase1-core.md
 
 ## Completed tasks
 
+(mergeado a main, 44/44 tests)
+
+---
+
+# Sub-proyecto Dashboards v2 · Fase 2 (Comunicación)
+
+Branch: feat/dashboards-v2-fase2-comunicacion (creada desde main en e3317920 el 2026-07-03).
+Plan: docs/superpowers/plans/2026-07-03-dashboards-v2-fase2-comunicacion.md
+Spec: docs/superpowers/specs/2026-07-03-dashboards-v2-fase2-comunicacion-design.md
+
+## Completed tasks
+
