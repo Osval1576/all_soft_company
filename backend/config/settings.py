@@ -124,8 +124,14 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # -----------------------
 # CORS para Vue (SPA)
 # -----------------------
+# Vite usa 5173 por default y sube al siguiente puerto libre si está ocupado.
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
 ]
 
 # Si vas a enviar Authorization: Bearer <token>
@@ -164,14 +170,15 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-]
-
 CORS_ALLOW_CREDENTIALS = True  # clave para enviar cookies al frontend
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
 ]
 
 # En dev (HTTP) lo más estable es Lax.

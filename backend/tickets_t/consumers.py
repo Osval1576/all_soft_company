@@ -1,11 +1,11 @@
 import json
+
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
+
 from .models import Ticket, TicketMessage
 
-def role(user):
-    return getattr(user, "role", None)
 
 class TicketChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -55,25 +55,26 @@ class TicketChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(event["message"]))
 
     # ---- DB helpers ----
-@database_sync_to_async
-def user_can_access_ticket(self, user_id, ticket_id):
-    from django.contrib.auth import get_user_model
-    User = get_user_model()
 
-    try:
-        ticket = Ticket.objects.select_related("creado_por", "asignado_a").get(id=ticket_id)
-        user = User.objects.get(id=user_id)
-    except ObjectDoesNotExist:
+    @database_sync_to_async
+    def user_can_access_ticket(self, user_id, ticket_id):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        try:
+            ticket = Ticket.objects.select_related("creado_por", "asignado_a").get(id=ticket_id)
+            user = User.objects.get(id=user_id)
+        except (Ticket.DoesNotExist, User.DoesNotExist):
+            return False
+
+        r = getattr(user, "role", None)
+        if r == "ADMIN" or user.is_superuser:
+            return True
+        if r == "CUSTOMER":
+            return ticket.creado_por_id == user_id
+        if r == "AGENT":
+            return ticket.asignado_a_id == user_id
         return False
-
-    r = getattr(user, "role", None)
-    if r == "ADMIN":
-        return True
-    if r == "CUSTOMER":
-        return ticket.creado_por_id == user_id
-    if r == "AGENT":
-        return ticket.asignado_a_id == user_id
-    return False
 
     @database_sync_to_async
     def create_message(self, user_id, ticket_id, content):
@@ -95,6 +96,3 @@ def user_can_access_ticket(self, user_id, ticket_id):
             "content": m.content,
             "created_at": m.created_at.isoformat(),
         }
-
-
-
