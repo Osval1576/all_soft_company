@@ -1,10 +1,11 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.core import mail
 from tickets_t.models import Ticket
 from notifications.models import Notification, NotificationPreference
 from notifications.presence import mark_online, is_online, mark_offline
 from notifications.emails import send_notification_email
+from notifications.services import dispatch
 
 User = get_user_model()
 
@@ -60,3 +61,61 @@ class EmailHelperTests(TestCase):
         u = User.objects.create_user(username="e2", password="x", role="CUSTOMER", email="")
         send_notification_email(u, "Asunto", "Cuerpo")
         self.assertEqual(len(mail.outbox), 0)
+
+
+@override_settings(NOTIFICATIONS_EMAIL_ASYNC=False)
+class DispatchTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username="adm", password="x", role="ADMIN", email="adm@x.com")
+        self.agent = User.objects.create_user(username="ag", password="x", role="AGENT", email="ag@x.com")
+        self.customer = User.objects.create_user(username="cu", password="x", role="CUSTOMER", email="cu@x.com")
+        self.ticket = Ticket.objects.create(
+            reference="ALS-20260101-000100", titulo="Impresora rota", descripcion="d",
+            prioridad="MEDIUM", estado="RESOLVED",
+            creado_por=self.customer, asignado_a=self.agent,
+        )
+
+    def test_status_changed_notifies_customer_with_email(self):
+        dispatch("status_changed", self.ticket, actor=self.agent)
+        notifs = Notification.objects.filter(recipient=self.customer, kind="status_changed")
+        self.assertEqual(notifs.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["cu@x.com"])
+
+    def test_status_changed_pref_off_suppresses_email_but_keeps_notification(self):
+        prefs = NotificationPreference.for_user(self.customer)
+        prefs.email_on_status_changed = False
+        prefs.save()
+        dispatch("status_changed", self.ticket, actor=self.agent)
+        self.assertEqual(Notification.objects.filter(recipient=self.customer).count(), 1)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_assigned_notifies_customer_and_excludes_actor(self):
+        dispatch("assigned", self.ticket, actor=self.agent)
+        self.assertEqual(Notification.objects.filter(recipient=self.customer, kind="assigned").count(), 1)
+        # el agent es el actor -> no se notifica a sí mismo
+        self.assertEqual(Notification.objects.filter(recipient=self.agent).count(), 0)
+
+    def test_new_message_notifies_other_party_not_sender(self):
+        dispatch("new_message", self.ticket, actor=self.customer, extra={"content": "hola"})
+        self.assertEqual(Notification.objects.filter(recipient=self.agent, kind="new_message").count(), 1)
+        self.assertEqual(Notification.objects.filter(recipient=self.customer).count(), 0)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["ag@x.com"])
+
+    def test_new_message_email_suppressed_when_recipient_online(self):
+        mark_online(self.agent.id)
+        dispatch("new_message", self.ticket, actor=self.customer, extra={"content": "hola"})
+        self.assertEqual(Notification.objects.filter(recipient=self.agent).count(), 1)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_ticket_created_notifies_admins_and_agents(self):
+        new_ticket = Ticket.objects.create(
+            reference="ALS-20260101-000101", titulo="Nuevo", descripcion="d",
+            prioridad="MEDIUM", estado="OPEN", creado_por=self.customer,
+        )
+        dispatch("ticket_created", new_ticket, actor=self.customer)
+        self.assertEqual(Notification.objects.filter(recipient=self.admin, kind="ticket_created").count(), 1)
+        self.assertEqual(Notification.objects.filter(recipient=self.agent, kind="ticket_created").count(), 1)
+        # email solo al admin (los agentes son aviso de pool, sin email)
+        self.assertEqual([m.to for m in mail.outbox], [["adm@x.com"]])
