@@ -33,3 +33,18 @@ export async function createUser(data) {
 export async function deleteUser(id) {
   await http.delete(`/api/users/users/${id}/`);
 }
+
+export async function getPool() {
+  const res = await http.get("/api/tickets_t/pool/");
+  return res.data;
+}
+
+export async function takeTicket(id) {
+  const res = await http.post(`/api/tickets_t/${id}/take/`);
+  return res.data;
+}
+
+export async function getTicketEvents(id) {
+  const res = await http.get(`/api/tickets_t/${id}/events/`);
+  return res.data;
+}

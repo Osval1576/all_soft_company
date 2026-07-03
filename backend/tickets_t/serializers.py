@@ -3,6 +3,7 @@ from django.db import transaction
 from rest_framework import serializers
 from .models import Ticket
 from .models import TicketMessage
+from .models import TicketEvent
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -12,6 +13,13 @@ def role(user):
 
 
 class TicketSerializer(serializers.ModelSerializer):
+    ALLOWED_TRANSITIONS = {
+        "OPEN": {"OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"},
+        "IN_PROGRESS": {"IN_PROGRESS", "RESOLVED", "CLOSED"},
+        "RESOLVED": {"RESOLVED", "CLOSED"},
+        "CLOSED": {"CLOSED"},
+    }
+
     class Meta:
         model = Ticket
         fields = [
@@ -24,8 +32,39 @@ class TicketSerializer(serializers.ModelSerializer):
             "creado_por",
             "asignado_a",
             "created_at",
+            "updated_at",
         ]
-        read_only_fields = ["id", "reference", "creado_por", "created_at"]
+        read_only_fields = ["id", "reference", "creado_por", "created_at", "updated_at"]
+
+    def validate_asignado_a(self, value):
+        if value is None:
+            return value
+        if not (value.is_superuser or getattr(value, "role", None) == "AGENT"):
+            raise serializers.ValidationError(
+                "Solo se puede asignar a técnicos (rol AGENT)."
+            )
+        return value
+
+    def validate_estado(self, value):
+        if not self.instance:
+            return value
+        current = self.instance.estado
+        if current == value:
+            return value
+        request = self.context.get("request")
+        is_admin = bool(
+            request
+            and request.user.is_authenticated
+            and (request.user.is_superuser or getattr(request.user, "role", None) == "ADMIN")
+        )
+        if is_admin and current in ("RESOLVED", "CLOSED") and value == "OPEN":
+            return value
+        allowed = self.ALLOWED_TRANSITIONS.get(current, {value})
+        if value not in allowed:
+            raise serializers.ValidationError(
+                f"Transición no permitida: {current} → {value}."
+            )
+        return value
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -113,3 +152,11 @@ class TicketMessageSerializer(serializers.ModelSerializer):
             "sender_role",
             "created_at",
         ]
+
+
+class TicketEventSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source="actor.username", read_only=True, default=None)
+
+    class Meta:
+        model = TicketEvent
+        fields = ["id", "kind", "actor", "actor_username", "payload", "created_at"]

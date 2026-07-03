@@ -3,25 +3,6 @@
     <AppTopBar title="Mis Tickets" />
 
     <div class="content">
-      <div class="stats-row">
-        <div class="stat-card">
-          <span class="stat-value">{{ tickets.length }}</span>
-          <span class="stat-label">Total</span>
-        </div>
-        <div class="stat-card stat-card--open">
-          <span class="stat-value">{{ count("OPEN") }}</span>
-          <span class="stat-label">Abiertos</span>
-        </div>
-        <div class="stat-card stat-card--progress">
-          <span class="stat-value">{{ count("IN_PROGRESS") }}</span>
-          <span class="stat-label">En proceso</span>
-        </div>
-        <div class="stat-card stat-card--resolved">
-          <span class="stat-value">{{ count("RESOLVED") }}</span>
-          <span class="stat-label">Resueltos</span>
-        </div>
-      </div>
-
       <div class="main-area">
         <aside class="ticket-list">
           <div class="list-toolbar">
@@ -195,29 +176,7 @@ onMounted(load);
   display: flex;
   flex-direction: column;
   padding: 16px 20px;
-  gap: 16px;
 }
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  flex-shrink: 0;
-}
-.stat-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  box-shadow: var(--shadow-sm);
-}
-.stat-card--open     { border-left: 3px solid var(--c-open); }
-.stat-card--progress { border-left: 3px solid var(--c-progress); }
-.stat-card--resolved { border-left: 3px solid var(--c-resolved); }
-.stat-value { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1.1; }
-.stat-label { font-size: 12px; color: var(--text-2); font-weight: 500; }
 .main-area {
   flex: 1;
   min-height: 0;
@@ -291,7 +250,7 @@ onMounted(load);
   align-items: center;
   gap: 7px;
 }
-.ticket-ref { font-size: 11px; color: var(--text-2); font-weight: 600; font-family: monospace; }
+.ticket-ref { font-size: 11px; color: var(--text-2); font-weight: 600; font-family: var(--font-mono); }
 .ticket-title {
   font-size: 13px;
   font-weight: 500;
@@ -300,8 +259,9 @@ onMounted(load);
   overflow: hidden;
   text-overflow: ellipsis;
   padding-left: 15px;
+  font-family: var(--font-body);
 }
-.ticket-date { font-size: 11px; color: var(--text-3); padding-left: 15px; }
+.ticket-date { font-size: 11px; color: var(--text-3); padding-left: 15px; font-family: var(--font-mono); letter-spacing: 0.5px; }
 .chat-area { min-height: 0; }
 .empty-chat {
   height: 100%;

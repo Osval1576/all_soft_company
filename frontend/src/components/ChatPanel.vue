@@ -3,7 +3,17 @@
     <header v-if="showHeader" class="panel-header">
       <div class="header-info">
         <span class="header-title">{{ title }}</span>
-        <span class="header-sub">Chat en tiempo real</span>
+        <div class="header-meta">
+          <span class="conn-badge" :class="`conn-badge--${wsStatus}`">
+            <span class="conn-dot" aria-hidden="true"></span>
+            <span>{{ CONN_LABEL[wsStatus] || wsStatus }}</span>
+          </span>
+          <button
+            v-if="wsStatus === 'disconnected'"
+            @click="wsRetry"
+            class="btn-retry"
+          >Reintentar</button>
+        </div>
       </div>
       <div v-if="status && canUpdateStatus" class="status-control">
         <select :value="status" @change="$emit('update:status', $event.target.value)" class="status-select">
@@ -44,18 +54,27 @@
       <input
         v-model="draft"
         @keydown.enter.prevent="send"
-        placeholder="Escribe un mensaje..."
+        :placeholder="composerPlaceholder"
         class="composer-input"
+        :disabled="wsStatus === 'disconnected'"
       />
-      <button @click="send" :disabled="!draft.trim()" class="composer-btn">Enviar</button>
+      <button
+        @click="send"
+        :disabled="!draft.trim() || wsStatus !== 'connected'"
+        class="composer-btn"
+      >Enviar</button>
     </footer>
+
+    <TicketEventTimeline :events="events" />
   </div>
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, ref, watch, computed } from "vue";
-import { getTicketMessages } from "../api/tickets.api";
+import { nextTick, ref, watch, computed } from "vue";
+import { getTicketMessages, getTicketEvents } from "../api/tickets.api";
 import { useAuthStore } from "../stores/auth.store";
+import { useWsConnection } from "../composables/useWsConnection";
+import TicketEventTimeline from "./tickets/TicketEventTimeline.vue";
 
 const props = defineProps({
   ticketId:        { type: Number, required: true },
@@ -70,11 +89,22 @@ defineEmits(["update:status"]);
 const auth = useAuthStore();
 const me   = computed(() => auth.user?.username);
 
-const messages  = ref([]);
-const loading   = ref(false);
-const draft     = ref("");
-const ws        = ref(null);
+const messages = ref([]);
+const events = ref([]);
+const loading = ref(false);
+const draft = ref("");
 const messagesEl = ref(null);
+
+const CONN_LABEL = {
+  connecting: "Conectando…",
+  connected: "Conectado",
+  reconnecting: "Reconectando…",
+  disconnected: "Desconectado",
+};
+
+const composerPlaceholder = computed(() =>
+  wsStatus.value === "connected" ? "Escribe un mensaje..." : "Chat desconectado"
+);
 
 function scrollToBottom() {
   if (messagesEl.value) messagesEl.value.scrollTop = messagesEl.value.scrollHeight;
@@ -86,10 +116,30 @@ function formatTime(iso) {
   } catch { return iso; }
 }
 
-async function loadHistory() {
+function wsUrl() {
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const host = import.meta.env.VITE_WS_HOST || window.location.host;
+  return `${proto}//${host}/ws/chat/${props.ticketId}/`;
+}
+
+const { status: wsStatus, send: wsSend, retry: wsRetry, close: wsClose } = useWsConnection({
+  url: wsUrl,
+  onMessage: async (m) => {
+    messages.value.push(m);
+    await nextTick();
+    scrollToBottom();
+  },
+});
+
+async function loadAll() {
   loading.value = true;
   try {
-    messages.value = await getTicketMessages(props.ticketId);
+    const [msgs, evts] = await Promise.all([
+      getTicketMessages(props.ticketId),
+      getTicketEvents(props.ticketId).catch(() => []),
+    ]);
+    messages.value = msgs;
+    events.value = evts;
     await nextTick();
     scrollToBottom();
   } finally {
@@ -97,29 +147,19 @@ async function loadHistory() {
   }
 }
 
-function connectWs() {
-  if (ws.value) ws.value.close();
-  ws.value = new WebSocket(`ws://localhost:8000/ws/chat/${props.ticketId}/`);
-  ws.value.onmessage = async (evt) => {
-    messages.value.push(JSON.parse(evt.data));
-    await nextTick();
-    scrollToBottom();
-  };
-}
-
 function send() {
   const text = draft.value.trim();
-  if (!text || !ws.value || ws.value.readyState !== WebSocket.OPEN) return;
-  ws.value.send(JSON.stringify({ content: text }));
-  draft.value = "";
+  if (!text) return;
+  if (wsSend({ content: text })) {
+    draft.value = "";
+  }
 }
 
 watch(() => props.ticketId, async () => {
-  await loadHistory();
-  connectWs();
+  wsClose();
+  await loadAll();
+  wsRetry();
 }, { immediate: true });
-
-onBeforeUnmount(() => { if (ws.value) ws.value.close(); });
 </script>
 
 <style scoped>
@@ -130,19 +170,20 @@ onBeforeUnmount(() => { if (ws.value) ws.value.close(); });
   background: var(--surface);
   border-radius: var(--r);
   overflow: hidden;
-  box-shadow: var(--shadow);
+  border: 0.5px solid var(--border);
 }
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0.5px solid var(--border);
   flex-shrink: 0;
   gap: 12px;
 }
-.header-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.header-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .header-title {
+  font-family: var(--font-display);
   font-weight: 600;
   font-size: 14px;
   color: var(--text);
@@ -150,17 +191,49 @@ onBeforeUnmount(() => { if (ws.value) ws.value.close(); });
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.header-sub { font-size: 11px; color: var(--text-3); }
+.header-meta { display: flex; align-items: center; gap: 10px; }
+.conn-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.conn-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); }
+.conn-badge--connected .conn-dot { background: var(--c-resolved, #10B981); box-shadow: 0 0 0 3px rgba(16,185,129,.15); }
+.conn-badge--connected { color: var(--c-resolved, #10B981); }
+.conn-badge--connecting .conn-dot,
+.conn-badge--reconnecting .conn-dot {
+  background: var(--c-open, #F59E0B);
+  animation: conn-pulse 1s ease-in-out infinite;
+}
+.conn-badge--connecting,
+.conn-badge--reconnecting { color: var(--c-open, #F59E0B); }
+@keyframes conn-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.btn-retry {
+  padding: 4px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  cursor: pointer;
+}
+[data-theme="dark"] .btn-retry { color: var(--accent-2); }
 .status-select {
   padding: 4px 10px;
-  border: 1px solid var(--border);
+  border: 0.5px solid var(--border);
   border-radius: var(--r-sm);
   background: var(--surface-2);
   color: var(--text);
   font-size: 12px;
-  cursor: pointer;
 }
-.status-select:focus { border-color: var(--accent); outline: none; }
 .messages {
   flex: 1;
   overflow-y: auto;
@@ -170,8 +243,7 @@ onBeforeUnmount(() => { if (ws.value) ws.value.close(); });
   gap: 8px;
   background: var(--surface-2);
 }
-.loading-state,
-.empty-messages {
+.loading-state, .empty-messages {
   color: var(--text-3);
   font-size: 13px;
   text-align: center;
@@ -180,12 +252,7 @@ onBeforeUnmount(() => { if (ws.value) ws.value.close(); });
 .msg-row { display: flex; }
 .msg-row--me    { justify-content: flex-end; }
 .msg-row--other { justify-content: flex-start; }
-.bubble {
-  max-width: 72%;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
+.bubble { max-width: 72%; display: flex; flex-direction: column; gap: 3px; }
 .msg-row--me .bubble {
   background: var(--accent);
   color: var(--accent-fg);
@@ -197,7 +264,7 @@ onBeforeUnmount(() => { if (ws.value) ws.value.close(); });
   color: var(--text);
   border-radius: var(--r-sm) var(--r) var(--r) var(--r);
   padding: 8px 12px;
-  box-shadow: var(--shadow-sm);
+  border: 0.5px solid var(--border);
 }
 .bubble-meta {
   display: flex;
@@ -205,6 +272,8 @@ onBeforeUnmount(() => { if (ws.value) ws.value.close(); });
   gap: 6px;
   font-size: 10px;
   opacity: .75;
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
 }
 .msg-row--me .bubble-meta { justify-content: flex-end; }
 .bubble-sender { font-weight: 600; }
@@ -213,31 +282,32 @@ onBeforeUnmount(() => { if (ws.value) ws.value.close(); });
   display: flex;
   gap: 8px;
   padding: 12px 14px;
-  border-top: 1px solid var(--border);
+  border-top: 0.5px solid var(--border);
   background: var(--surface);
   flex-shrink: 0;
 }
 .composer-input {
   flex: 1;
   padding: 9px 14px;
-  border: 1px solid var(--border);
+  border: 0.5px solid var(--border);
   border-radius: var(--r);
   background: var(--surface-2);
   color: var(--text);
+  font-family: var(--font-body);
   font-size: 13px;
-  transition: border-color .15s;
 }
 .composer-input:focus { border-color: var(--accent); outline: none; }
-.composer-input::placeholder { color: var(--text-3); }
+.composer-input:disabled { opacity: 0.5; }
 .composer-btn {
   padding: 9px 18px;
   border-radius: var(--r);
   background: var(--accent);
   color: var(--accent-fg);
+  font-family: var(--font-display);
   font-size: 13px;
-  font-weight: 600;
-  transition: background .15s, opacity .15s;
-  white-space: nowrap;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
 }
 .composer-btn:hover:not(:disabled) { background: var(--accent-hover); }
 .composer-btn:disabled { opacity: .4; cursor: not-allowed; }

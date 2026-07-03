@@ -16,9 +16,8 @@
         <span class="user-name">{{ auth.user?.username }}</span>
         <span class="role-badge">{{ roleLabel }}</span>
       </div>
-      <button class="btn-icon" @click="toggle" :title="isDark ? 'Modo claro' : 'Modo oscuro'">
-        <span v-if="isDark">&#9788;</span>
-        <span v-else>&#9790;</span>
+      <button class="tb-theme" @click="toggle" :aria-label="isDark ? 'Modo claro' : 'Modo oscuro'">
+        <i :class="isDark ? 'ti ti-sun' : 'ti ti-moon'" aria-hidden="true"></i>
       </button>
       <button class="btn-logout" @click="auth.logout()">Salir</button>
     </div>
@@ -71,7 +70,7 @@ const roleLabel = computed(() => {
 }
 .brand-name { font-weight: 700; font-size: 15px; color: var(--text); }
 .sep { color: var(--text-3); font-size: 18px; line-height: 1; }
-.page-title { color: var(--text-2); font-size: 14px; font-weight: 500; }
+.page-title { color: var(--text-2); font-size: 14px; font-weight: 500; font-family: var(--font-display); letter-spacing: -0.01em; }
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 .user-chip { display: flex; align-items: center; gap: 8px; }
 .user-name { font-size: 13px; font-weight: 500; color: var(--text); }
@@ -85,20 +84,20 @@ const roleLabel = computed(() => {
   text-transform: uppercase;
   letter-spacing: .4px;
 }
-.btn-icon {
+.tb-theme {
   width: 34px;
   height: 34px;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
   color: var(--text-2);
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all .15s;
+  background: transparent;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
 }
-.btn-icon:hover { background: var(--border); color: var(--text); }
+.tb-theme:hover { background: var(--surface-2); color: var(--text); border-color: var(--text-3); }
+.tb-theme i { font-size: 15px; }
 .btn-logout {
   padding: 6px 14px;
   border-radius: var(--r-sm);
