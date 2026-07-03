@@ -1,22 +1,30 @@
 /* ─── Design Tokens ─── */
 :root {
-  --accent:        #2563EB;
-  --accent-hover:  #1D4ED8;
-  --accent-light:  #EFF6FF;
+  /* Type — landing v2 */
+  --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, monospace;
+
+  /* Accent — electric blue */
+  --accent:        #0038FF;
+  --accent-hover:  #0026CC;
+  --accent-2:      #0056FF;
+  --accent-light:  rgba(0,56,255,.08);
+  --accent-glow:   rgba(0,56,255,.35);
   --accent-fg:     #FFFFFF;
 
-  --bg:        #F8FAFC;
+  --bg:        #FAFBFC;
   --surface:   #FFFFFF;
-  --surface-2: #F1F5F9;
-  --border:    #E2E8F0;
+  --surface-2: #F0F2F7;
+  --border:    #E4E7EF;
 
-  --text:   #0F172A;
-  --text-2: #64748B;
-  --text-3: #94A3B8;
+  --text:   #0A0F1F;
+  --text-2: #4A5163;
+  --text-3: #8892A6;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.05);
-  --shadow:    0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.04);
+  --shadow-sm: 0 1px 2px rgba(10,15,31,.05);
+  --shadow:    0 1px 3px rgba(10,15,31,.08), 0 1px 2px rgba(10,15,31,.04);
+  --shadow-md: 0 4px 6px -1px rgba(10,15,31,.07), 0 2px 4px rgba(10,15,31,.04);
 
   --r-sm: 6px;
   --r:    10px;
@@ -42,22 +50,24 @@
 }
 
 [data-theme="dark"] {
-  --accent:       #3B82F6;
-  --accent-hover: #2563EB;
-  --accent-light: rgba(59,130,246,.14);
+  --accent:       #5B7CFF;
+  --accent-hover: #7A94FF;
+  --accent-2:     #00E5FF;
+  --accent-light: rgba(91,124,255,.14);
+  --accent-glow:  rgba(91,124,255,.45);
 
-  --bg:        #0F172A;
-  --surface:   #1E293B;
-  --surface-2: #27374D;
-  --border:    #334155;
+  --bg:        #05090F;
+  --surface:   #0B101B;
+  --surface-2: #131A2A;
+  --border:    #1F2A44;
 
-  --text:   #F1F5F9;
-  --text-2: #94A3B8;
-  --text-3: #64748B;
+  --text:   #EDEFF5;
+  --text-2: #A9B4C9;
+  --text-3: #6B7691;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
-  --shadow:    0 1px 3px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.2);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.4), 0 2px 4px rgba(0,0,0,.25);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow:    0 1px 3px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.3);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.55), 0 2px 4px rgba(0,0,0,.35);
 
   --c-open-bg:     rgba(245,158,11,.14);
   --c-progress-bg: rgba(59,130,246,.14);
@@ -76,7 +86,7 @@
 html, body { height: 100%; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-body);
   background: var(--bg);
   color: var(--text);
   line-height: 1.5;
