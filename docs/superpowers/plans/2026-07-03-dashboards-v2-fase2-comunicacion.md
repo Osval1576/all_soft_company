@@ -1050,15 +1050,16 @@ class IntegrationTests(TestCase):
         )
 
     def test_message_creates_notification_for_other_party(self):
+        from asgiref.sync import async_to_sync
         from tickets_t.consumers import TicketChatConsumer
         consumer = TicketChatConsumer()
-        consumer.create_message.__wrapped__(consumer, self.customer.id, self.ticket.id, "hola")
+        # create_message está envuelto por @database_sync_to_async: async_to_sync
+        # lo ejecuta hasta completarse (corre el path real, incluido el dispatch).
+        async_to_sync(consumer.create_message)(self.customer.id, self.ticket.id, "hola")
         self.assertEqual(
             Notification.objects.filter(recipient=self.agent, kind="new_message").count(), 1
         )
 ```
-
-Note: `create_message` está envuelto por `@database_sync_to_async`; `.__wrapped__` invoca la función sync original directamente para poder testearla sin bucle async.
 
 - [ ] **Step 2: Correr los tests para verificar que fallan**
 
