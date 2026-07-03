@@ -52,3 +52,89 @@ class StateTransitionTests(TestCase):
         self.ticket.save()
         r = self._client(self.agent).patch(f"/api/tickets_t/{self.ticket.id}/", {"estado": "OPEN"}, format="json")
         self.assertEqual(r.status_code, 400)
+
+
+class PoolAndTakeTests(TestCase, ):
+    def setUp(self):
+        self.admin = User.objects.create_user(username="adm2", password="x", role="ADMIN")
+        self.agent1 = User.objects.create_user(username="ag1", password="x", role="AGENT")
+        self.agent2 = User.objects.create_user(username="ag2", password="x", role="AGENT")
+        self.customer = User.objects.create_user(username="cu2", password="x", role="CUSTOMER")
+        self.t_unassigned = Ticket.objects.create(
+            reference="ALS-20260101-000010",
+            titulo="U", descripcion="d",
+            prioridad="MEDIUM", estado="OPEN",
+            creado_por=self.customer,
+        )
+        self.t_assigned = Ticket.objects.create(
+            reference="ALS-20260101-000011",
+            titulo="A", descripcion="d",
+            prioridad="MEDIUM", estado="OPEN",
+            creado_por=self.customer, asignado_a=self.agent1,
+        )
+
+    def _client(self, u):
+        c = APIClient()
+        c.force_authenticate(user=u)
+        return c
+
+    def test_pool_lists_only_unassigned(self):
+        r = self._client(self.agent1).get("/api/tickets_t/pool/")
+        self.assertEqual(r.status_code, 200)
+        ids = [t["id"] for t in r.json()]
+        self.assertIn(self.t_unassigned.id, ids)
+        self.assertNotIn(self.t_assigned.id, ids)
+
+    def test_pool_forbidden_for_customer(self):
+        r = self._client(self.customer).get("/api/tickets_t/pool/")
+        self.assertEqual(r.status_code, 403)
+
+    def test_take_assigns_and_creates_event(self):
+        from tickets_t.models import TicketEvent
+        r = self._client(self.agent1).post(f"/api/tickets_t/{self.t_unassigned.id}/take/")
+        self.assertEqual(r.status_code, 200)
+        self.t_unassigned.refresh_from_db()
+        self.assertEqual(self.t_unassigned.asignado_a_id, self.agent1.id)
+        self.assertTrue(TicketEvent.objects.filter(ticket=self.t_unassigned, kind="assigned", actor=self.agent1).exists())
+
+    def test_take_conflict_if_already_assigned(self):
+        r = self._client(self.agent2).post(f"/api/tickets_t/{self.t_assigned.id}/take/")
+        self.assertEqual(r.status_code, 409)
+
+    def test_take_forbidden_for_customer(self):
+        r = self._client(self.customer).post(f"/api/tickets_t/{self.t_unassigned.id}/take/")
+        self.assertEqual(r.status_code, 403)
+
+    def test_admin_assigns_only_to_agent(self):
+        r = self._client(self.admin).patch(
+            f"/api/tickets_t/{self.t_unassigned.id}/",
+            {"asignado_a": self.customer.id},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_admin_assigns_agent_ok(self):
+        r = self._client(self.admin).patch(
+            f"/api/tickets_t/{self.t_unassigned.id}/",
+            {"asignado_a": self.agent2.id},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 200)
+
+    def test_status_change_emits_event(self):
+        from tickets_t.models import TicketEvent
+        self._client(self.agent1).patch(
+            f"/api/tickets_t/{self.t_assigned.id}/",
+            {"estado": "IN_PROGRESS"},
+            format="json",
+        )
+        self.assertTrue(TicketEvent.objects.filter(
+            ticket=self.t_assigned, kind="status_changed", payload__to="IN_PROGRESS"
+        ).exists())
+
+    def test_events_endpoint_returns_history(self):
+        from tickets_t.models import TicketEvent
+        TicketEvent.objects.create(ticket=self.t_unassigned, kind="created", actor=self.customer)
+        r = self._client(self.customer).get(f"/api/tickets_t/{self.t_unassigned.id}/events/")
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(any(e["kind"] == "created" for e in r.json()))
