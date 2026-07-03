@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "users",
     "tickets_t",
+    "notifications",
     "channels",
     "landing_cms",
     "django_cleanup.apps.CleanupConfig",
