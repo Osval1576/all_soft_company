@@ -53,11 +53,11 @@ class TicketViewSet(viewsets.ModelViewSet):
             self._emit(ticket, "created", self.request.user)
 
     def perform_update(self, serializer):
-        instance_before = self.get_object()
+        inst = serializer.instance
         old = {
-            "estado": instance_before.estado,
-            "asignado_a_id": instance_before.asignado_a_id,
-            "prioridad": instance_before.prioridad,
+            "estado": inst.estado,
+            "asignado_a_id": inst.asignado_a_id,
+            "prioridad": inst.prioridad,
         }
         with transaction.atomic():
             ticket = serializer.save()
@@ -91,7 +91,10 @@ class TicketViewSet(viewsets.ModelViewSet):
         user = request.user
         if not (_is_admin(user) or _is_agent(user)):
             return Response({"detail": "Solo técnicos o admin."}, status=403)
-        qs = Ticket.objects.filter(asignado_a__isnull=True).order_by("-created_at")
+        qs = Ticket.objects.filter(
+            asignado_a__isnull=True,
+            estado__in=["OPEN", "IN_PROGRESS"],
+        ).order_by("-created_at")
         return Response(TicketSerializer(qs, many=True, context={"request": request}).data)
 
     # ---- take ----
@@ -101,17 +104,17 @@ class TicketViewSet(viewsets.ModelViewSet):
         if not _is_agent(user):
             return Response({"detail": "Solo técnicos pueden tomar tickets."}, status=403)
         try:
-            ticket = Ticket.objects.get(pk=pk)
+            with transaction.atomic():
+                ticket = Ticket.objects.select_for_update().get(pk=pk)
+                if ticket.asignado_a_id and ticket.asignado_a_id != user.id:
+                    return Response({"detail": "Ya asignado a otro técnico."}, status=409)
+                if ticket.asignado_a_id == user.id:
+                    return Response(TicketSerializer(ticket, context={"request": request}).data)
+                ticket.asignado_a = user
+                ticket.save(update_fields=["asignado_a"])
+                self._emit(ticket, "assigned", user, {"self_take": True, "to_user_id": user.id})
         except Ticket.DoesNotExist:
             return Response({"detail": "No encontrado."}, status=404)
-        if ticket.asignado_a_id and ticket.asignado_a_id != user.id:
-            return Response({"detail": "Ya asignado a otro técnico."}, status=409)
-        if ticket.asignado_a_id == user.id:
-            return Response(TicketSerializer(ticket, context={"request": request}).data)
-        with transaction.atomic():
-            ticket.asignado_a = user
-            ticket.save(update_fields=["asignado_a"])
-            self._emit(ticket, "assigned", user, {"self_take": True, "to_user_id": user.id})
         return Response(TicketSerializer(ticket, context={"request": request}).data)
 
     # ---- events ----
