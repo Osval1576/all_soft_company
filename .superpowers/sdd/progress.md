@@ -63,4 +63,5 @@ Spec: docs/superpowers/specs/2026-07-03-dashboards-v2-fase2-comunicacion-design.
 ## Completed tasks
 
 Task 1: complete (commits 22d9c222..b5e3fab3, review clean)
+Task 2: complete (commits a3849209..b92507d1, review clean)
 
