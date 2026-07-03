@@ -8,39 +8,43 @@ export function useWsConnection({ url, onMessage }) {
   let attempts = 0;
   let retryTimer = null;
   let closedByUser = false;
+  let generation = 0;
 
   function connect() {
     if (socket && socket.readyState !== WebSocket.CLOSED) return;
+    generation += 1;
+    const myGen = generation;
     try {
       status.value = attempts === 0 ? "connecting" : "reconnecting";
       const target = typeof url === "function" ? url() : url;
       socket = new WebSocket(target);
     } catch (e) {
-      scheduleRetry();
+      scheduleRetry(myGen);
       return;
     }
 
     socket.onopen = () => {
+      if (myGen !== generation) return;
       attempts = 0;
       status.value = "connected";
     };
-
     socket.onmessage = (evt) => {
+      if (myGen !== generation) return;
       try {
         const parsed = JSON.parse(evt.data);
         if (onMessage) onMessage(parsed);
-      } catch (_) { /* frame no JSON, ignorar */ }
+      } catch (_) {}
     };
-
-    socket.onerror = () => { /* onclose se dispara después */ };
-
+    socket.onerror = () => {};
     socket.onclose = () => {
+      if (myGen !== generation) return;
       if (closedByUser) return;
-      scheduleRetry();
+      scheduleRetry(myGen);
     };
   }
 
-  function scheduleRetry() {
+  function scheduleRetry(fromGen) {
+    if (fromGen !== generation) return;
     if (attempts >= BACKOFFS_MS.length) {
       status.value = "disconnected";
       return;
@@ -48,7 +52,7 @@ export function useWsConnection({ url, onMessage }) {
     status.value = "reconnecting";
     const wait = BACKOFFS_MS[attempts];
     attempts += 1;
-    retryTimer = setTimeout(connect, wait);
+    retryTimer = setTimeout(() => { if (fromGen === generation) connect(); }, wait);
   }
 
   function send(payload) {
@@ -59,8 +63,10 @@ export function useWsConnection({ url, onMessage }) {
 
   function close() {
     closedByUser = true;
+    generation += 1;
     if (retryTimer) clearTimeout(retryTimer);
-    if (socket) socket.close();
+    if (socket) { try { socket.close(); } catch (_) {} }
+    socket = null;
   }
 
   function retry() {
