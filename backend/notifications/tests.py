@@ -1,8 +1,10 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.core import mail
 from tickets_t.models import Ticket
 from notifications.models import Notification, NotificationPreference
 from notifications.presence import mark_online, is_online, mark_offline
+from notifications.emails import send_notification_email
 
 User = get_user_model()
 
@@ -44,3 +46,17 @@ class PresenceTests(TestCase):
         self.assertTrue(is_online(999))
         mark_offline(999)
         self.assertFalse(is_online(999))
+
+
+class EmailHelperTests(TestCase):
+    def test_sends_when_recipient_has_email(self):
+        u = User.objects.create_user(username="e1", password="x", role="CUSTOMER", email="e1@x.com")
+        send_notification_email(u, "Asunto", "Cuerpo del mail")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].subject, "Asunto")
+        self.assertEqual(mail.outbox[0].to, ["e1@x.com"])
+
+    def test_noop_without_email(self):
+        u = User.objects.create_user(username="e2", password="x", role="CUSTOMER", email="")
+        send_notification_email(u, "Asunto", "Cuerpo")
+        self.assertEqual(len(mail.outbox), 0)
