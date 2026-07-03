@@ -13,6 +13,13 @@ def role(user):
 
 
 class TicketSerializer(serializers.ModelSerializer):
+    ALLOWED_TRANSITIONS = {
+        "OPEN": {"OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"},
+        "IN_PROGRESS": {"IN_PROGRESS", "RESOLVED", "CLOSED"},
+        "RESOLVED": {"RESOLVED", "CLOSED"},
+        "CLOSED": {"CLOSED"},
+    }
+
     class Meta:
         model = Ticket
         fields = [
@@ -34,6 +41,27 @@ class TicketSerializer(serializers.ModelSerializer):
         if not (value.is_superuser or getattr(value, "role", None) == "AGENT"):
             raise serializers.ValidationError(
                 "Solo se puede asignar a técnicos (rol AGENT)."
+            )
+        return value
+
+    def validate_estado(self, value):
+        if not self.instance:
+            return value
+        current = self.instance.estado
+        if current == value:
+            return value
+        request = self.context.get("request")
+        is_admin = bool(
+            request
+            and request.user.is_authenticated
+            and (request.user.is_superuser or getattr(request.user, "role", None) == "ADMIN")
+        )
+        if is_admin and current in ("RESOLVED", "CLOSED") and value == "OPEN":
+            return value
+        allowed = self.ALLOWED_TRANSITIONS.get(current, {value})
+        if value not in allowed:
+            raise serializers.ValidationError(
+                f"Transición no permitida: {current} → {value}."
             )
         return value
 
