@@ -103,3 +103,5 @@ Pre-flight: nit DRY conocido — can_access_ticket (T2) coexiste con user_can_ac
 
 ## Completed tasks
 
+Task 1: complete (commits e4853af0..c2c1cea7, review clean; fixture PNG del brief estaba corrupta -> reemplazada por PNG 1x1 válido en _png_bytes(); 4/4 + suite tickets_t 18/18). Minors informativos: validador confía en content-type (mitigado por PIL.verify + firma %PDF); sin test de límites de tamaño (heredado del brief) — para barrido final.
+
