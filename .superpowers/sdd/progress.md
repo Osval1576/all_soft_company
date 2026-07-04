@@ -111,4 +111,7 @@ Task 5: complete (commits 4099af53..80ff7b33, build limpio, review approved; sin
 Task 6: complete (commits 1dcef3d0..2e101c3e, build limpio, review approved; cross-origin OK — imágenes/PDF vía fetch-blob, objectURLs revocados). Adjuntos completo T1-T6. Minor DRY: prettySize duplicado en ChatPanel.vue y MessageAttachment.vue — para barrido final.
 Task 7: complete (commits a63efcac..4bf2b60d, build limpio, review approved; filtro/orden sólido). Minors inherentes al plan: NaN en fechas inválidas / prioridad desconocida -> rank -1 (ok para datos bien formados).
 Task 8: complete (commits 4a8ac742..f86c5f18, build limpio, review approved; columnas 8/8, búsqueda combinada con filtros, sin filteredTickets colgado).
+Task 9: complete (commits 1497330a..fe17b413, build limpio, review approved; grid 2-col intacto, Pool/stats sin tocar). FINDING para fix wave final: el dropdown de orden del Técnico no alterna dirección (re-seleccionar la misma opción no dispara @change) -> queda asc por clave; el Admin sí alterna con headers.
+
+## Estado: 9/9 tasks completas. Pendiente: review final de rama + finishing-a-development-branch.
 
