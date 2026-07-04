@@ -74,5 +74,18 @@ Task 9: complete (commits ba5cd4f7..912acc0e, build limpio, review approved; só
 Task 10: complete (commits ccacf9c1..a2187232, 1 fix pass: bug Critical plan-mandated — bell no abría por bubbling al document, arreglado con @click.stop; build limpio). FINDINGS para fix wave final: dashboardRoute() duplicado en NotificationBell/ToastContainer/auth.store (extraer helper); sin a11y (Escape/role=dialog) en dropdown.
 Task 11: complete (commits b7daa208..f3be721a, build limpio, review approved). FINDINGS para fix wave final: NotificationSettings.vue onToggle/onMounted no manejan error del PATCH/GET (sin rollback ni feedback) — plan-mandated.
 
-## Estado: 11/11 tasks completas. Pendiente: review final de rama + finishing-a-development-branch.
+## Estado: 11/11 tasks completas.
+
+Review final de rama (opus): NEEDS FIXES -> merge-blocker arreglado.
+- Fix merge-blocker (commit 5ec8b651): aislar dispatch() en create_message del consumer con try/except + logging; un fallo de notificaciones ya NO puede romper la entrega del chat. También logging en el except del group_send de services.py (_push).
+- #9 proceso: corriendo suite backend COMPLETA en background para validar estado final antes del merge.
+
+Follow-ups aceptados por el review final (NO bloquean merge; para un ciclo posterior):
+- store.js: spread order {toastId:id,...n}->{...n,toastId:id}; markRead/markAllRead sin rollback en fallo; backoff sin recovery (igual que useWsConnection).
+- NotificationSettings.vue: onToggle/onMounted sin manejo de error del PATCH/GET.
+- dashboardRoute() duplicado x3 + redirectByRole -> extraer helper.
+- Inconsistencia rol backend (role) vs frontend (is_staff/is_superuser) -> estandarizar en `role` del /api/me/.
+- settings.py: import os a media altura + falta newline final (y asgi.py).
+- Bell dropdown a11y (Escape/role=dialog).
+- CAVEAT deploy (release notes): LocMemCache + InMemoryChannelLayer son per-process; NO mergear a entorno multi-proceso hasta Redis (sub-proyecto G).
 
