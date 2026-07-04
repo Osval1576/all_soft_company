@@ -46,6 +46,8 @@ class TicketViewSet(viewsets.ModelViewSet):
     # ---- event emission helpers ----
     def _emit(self, ticket, kind, actor, payload=None):
         TicketEvent.objects.create(ticket=ticket, kind=kind, actor=actor, payload=payload or {})
+        from notifications.services import notify_for_event
+        notify_for_event(ticket, kind, actor, payload or {})
 
     def perform_create(self, serializer):
         with transaction.atomic():

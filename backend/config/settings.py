@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "users",
     "tickets_t",
+    "notifications",
     "channels",
     "landing_cms",
     "django_cleanup.apps.CleanupConfig",
@@ -162,6 +163,14 @@ REST_FRAMEWORK = {
     },
 }
 
+# Cache (presence de notificaciones). LocMem hoy; Redis en sub-proyecto G.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "allsafe-default",
+    }
+}
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -188,3 +197,21 @@ CSRF_COOKIE_SAMESITE = "Lax"
 
 # Recomendado para que el navegador mande cookies en cross-origin fetch:
 CSRF_COOKIE_HTTPONLY = False  # el token csrf (si lo usas) suele necesitar leerse en JS
+
+import os
+
+# Email: Mailtrap (u otro SMTP) por env en dev; console si no hay EMAIL_HOST.
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+if EMAIL_HOST:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+    EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+    EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() == "true"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "AllSafe <no-reply@allsafe.local>")
+
+# Envío de emails en thread daemon (no bloquea WS/request). En tests se pone False.
+NOTIFICATIONS_EMAIL_ASYNC = True

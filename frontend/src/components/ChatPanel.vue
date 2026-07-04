@@ -70,9 +70,10 @@
 </template>
 
 <script setup>
-import { nextTick, ref, watch, computed } from "vue";
+import { nextTick, ref, watch, computed, onBeforeUnmount } from "vue";
 import { getTicketMessages, getTicketEvents } from "../api/tickets.api";
 import { useAuthStore } from "../stores/auth.store";
+import { useNotificationsStore } from "../stores/notifications.store";
 import { useWsConnection } from "../composables/useWsConnection";
 import TicketEventTimeline from "./tickets/TicketEventTimeline.vue";
 
@@ -88,6 +89,7 @@ defineEmits(["update:status"]);
 
 const auth = useAuthStore();
 const me   = computed(() => auth.user?.username);
+const notif = useNotificationsStore();
 
 const messages = ref([]);
 const events = ref([]);
@@ -156,10 +158,13 @@ function send() {
 }
 
 watch(() => props.ticketId, async () => {
+  notif.setActiveTicket(props.ticketId);
   wsClose();
   await loadAll();
   wsRetry();
 }, { immediate: true });
+
+onBeforeUnmount(() => notif.setActiveTicket(null));
 </script>
 
 <style scoped>

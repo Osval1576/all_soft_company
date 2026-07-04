@@ -16,6 +16,10 @@
         <span class="user-name">{{ auth.user?.username }}</span>
         <span class="role-badge">{{ roleLabel }}</span>
       </div>
+      <RouterLink to="/ajustes/notificaciones" class="tb-theme" aria-label="Ajustes de notificaciones">
+        <i class="ti ti-settings" aria-hidden="true"></i>
+      </RouterLink>
+      <NotificationBell />
       <button class="tb-theme" @click="toggle" :aria-label="isDark ? 'Modo claro' : 'Modo oscuro'">
         <i :class="isDark ? 'ti ti-sun' : 'ti ti-moon'" aria-hidden="true"></i>
       </button>
@@ -28,6 +32,7 @@
 import { computed } from 'vue'
 import { useAuthStore } from '../stores/auth.store.js'
 import { useTheme } from '../composables/useTheme.js'
+import NotificationBell from './notifications/NotificationBell.vue'
 
 defineProps({ title: { type: String, default: '' } })
 
