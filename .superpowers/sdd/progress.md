@@ -72,4 +72,7 @@ Task 7: complete (commits f36de4d7..f085c412, review clean; implementer se colg�
 Task 8: complete (commits 471b87bd..ec25bd80, build limpio, review approved). FINDINGS plan-mandated para fix wave final en notifications.store.js: (a) spread order `{toastId:id, ...n}` -> `{...n, toastId:id}`; (b) markRead/markAllRead no revierten el optimistic update si el POST falla (catch vacío); (c) backoff abandona tras 5 intentos sin recovery (igual que useWsConnection de chat — consistente, opcional).
 Task 9: complete (commits ba5cd4f7..912acc0e, build limpio, review approved; sólo nits cosméticos)
 Task 10: complete (commits ccacf9c1..a2187232, 1 fix pass: bug Critical plan-mandated — bell no abría por bubbling al document, arreglado con @click.stop; build limpio). FINDINGS para fix wave final: dashboardRoute() duplicado en NotificationBell/ToastContainer/auth.store (extraer helper); sin a11y (Escape/role=dialog) en dropdown.
+Task 11: complete (commits b7daa208..f3be721a, build limpio, review approved). FINDINGS para fix wave final: NotificationSettings.vue onToggle/onMounted no manejan error del PATCH/GET (sin rollback ni feedback) — plan-mandated.
+
+## Estado: 11/11 tasks completas. Pendiente: review final de rama + finishing-a-development-branch.
 
