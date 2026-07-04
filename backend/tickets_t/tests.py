@@ -1,7 +1,10 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 from tickets_t.models import Ticket
+from tickets_t.validators import validate_attachment
 
 User = get_user_model()
 
@@ -138,3 +141,46 @@ class PoolAndTakeTests(TestCase, ):
         r = self._client(self.customer).get(f"/api/tickets_t/{self.t_unassigned.id}/events/")
         self.assertEqual(r.status_code, 200)
         self.assertTrue(any(e["kind"] == "created" for e in r.json()))
+
+
+def _png_bytes():
+    # PNG 1x1 mínimo válido
+    import base64
+    return base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC"
+    )
+
+
+class AttachmentModelTests(TestCase):
+    def setUp(self):
+        self.customer = User.objects.create_user(username="atc", password="x", role="CUSTOMER")
+        self.ticket = Ticket.objects.create(
+            reference="ALS-20260101-000400", titulo="T", descripcion="d",
+            prioridad="MEDIUM", estado="OPEN", creado_por=self.customer,
+        )
+
+    def test_message_with_attachment_fields(self):
+        from tickets_t.models import TicketMessage
+        f = SimpleUploadedFile("foto.png", _png_bytes(), content_type="image/png")
+        m = TicketMessage.objects.create(
+            ticket=self.ticket, sender=self.customer, content="",
+            attachment=f, attachment_name="foto.png",
+            attachment_size=len(_png_bytes()), attachment_content_type="image/png",
+        )
+        self.assertTrue(m.attachment.name.startswith("ticket_adjuntos/"))
+        self.assertTrue(m.attachment.name.endswith(".png"))
+        self.assertEqual(m.attachment_name, "foto.png")
+
+    def test_validate_attachment_accepts_png(self):
+        f = SimpleUploadedFile("foto.png", _png_bytes(), content_type="image/png")
+        validate_attachment(f)  # no raise
+
+    def test_validate_attachment_rejects_bad_type(self):
+        f = SimpleUploadedFile("x.txt", b"hola", content_type="text/plain")
+        with self.assertRaises(DjangoValidationError):
+            validate_attachment(f)
+
+    def test_validate_attachment_rejects_fake_pdf(self):
+        f = SimpleUploadedFile("x.pdf", b"noPDF", content_type="application/pdf")
+        with self.assertRaises(DjangoValidationError):
+            validate_attachment(f)
