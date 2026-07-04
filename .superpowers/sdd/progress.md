@@ -108,4 +108,5 @@ Task 2: complete (commits 22087974..5184509f, review approved; 3/3 + suite 21/21
 Task 3: complete (commits d0719073..72149227, review approved; 6/6 + suite 27/27; broadcast+dispatch best-effort aislados, notif test verifica fila real). Sólo nits triviales.
 Task 4: complete (commits aafb1571..c27d9a72, review approved; 3/3 + suite 30/30; IDOR cerrado con filter(pk, ticket), bytes verificados byte-a-byte). Backend de adjuntos completo.
 Task 5: complete (commits 4099af53..80ff7b33, build limpio, review approved; sin duplicado local+WS, canSend correcto). Minor plan-mandated: error de upload usa alert() en vez de toast/inline — para barrido final si se quiere pulir.
+Task 6: complete (commits 1dcef3d0..2e101c3e, build limpio, review approved; cross-origin OK — imágenes/PDF vía fetch-blob, objectURLs revocados). Adjuntos completo T1-T6. Minor DRY: prettySize duplicado en ChatPanel.vue y MessageAttachment.vue — para barrido final.
 
