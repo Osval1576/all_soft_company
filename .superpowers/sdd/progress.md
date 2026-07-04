@@ -78,7 +78,7 @@ Task 11: complete (commits b7daa208..f3be721a, build limpio, review approved). F
 
 Review final de rama (opus): NEEDS FIXES -> merge-blocker arreglado.
 - Fix merge-blocker (commit 5ec8b651): aislar dispatch() en create_message del consumer con try/except + logging; un fallo de notificaciones ya NO puede romper la entrega del chat. También logging en el except del group_send de services.py (_push).
-- #9 proceso: corriendo suite backend COMPLETA en background para validar estado final antes del merge.
+- #9 proceso: suite backend COMPLETA corrida (background, 752s) -> 65/65 OK, cero regresiones. Merge-blockers despejados; rama merge-ready.
 
 Follow-ups aceptados por el review final (NO bloquean merge; para un ciclo posterior):
 - store.js: spread order {toastId:id,...n}->{...n,toastId:id}; markRead/markAllRead sin rollback en fallo; backoff sin recovery (igual que useWsConnection).
