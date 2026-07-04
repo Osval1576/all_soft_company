@@ -115,7 +115,7 @@ Task 9: complete (commits 1497330a..fe17b413, build limpio, review approved; gri
 
 ## Estado: 9/9 tasks completas.
 
-Review final de rama (opus): **READY para merge** — sin merge-blockers (a diferencia de Fase 2). IDOR cerrado, sin fuga de MEDIA, best-effort aislado, objectURLs limpios, payload consistente end-to-end (serializer + message_to_payload). Backend sin cambios desde el full run de tickets_t 30/30 (Task 4); tasks 5-9 fueron sólo frontend. Corriendo suite backend COMPLETA en background como disciplina pre-merge.
+Review final de rama (opus): **READY para merge** — sin merge-blockers (a diferencia de Fase 2). IDOR cerrado, sin fuga de MEDIA, best-effort aislado, objectURLs limpios, payload consistente end-to-end (serializer + message_to_payload). Backend sin cambios desde el full run de tickets_t 30/30 (Task 4); tasks 5-9 fueron sólo frontend. Suite backend COMPLETA corrida (background, 925s) -> **81/81 OK** (65 Fase 2 + 16 adjuntos), cero regresiones. Rama merge-ready.
 
 Follow-ups aceptados (NO bloquean; ciclo futuro):
 - Consumer text-path no usa message_to_payload (divergencia latente del "single source of truth") -> refactor: create_message devuelve el instance y broadcast vía message_to_payload. Agrupar con:
