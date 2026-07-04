@@ -68,4 +68,5 @@ Task 3: complete (commits 05e12fa8..3f402645, review clean; minor nits: import o
 Task 4: complete (commits 94924643..1e865197, review clean; minor: sin logging en el except del group_send en services.py — considerar logger.exception en barrido final)
 Task 5: complete (commits 3273c0a3..ec4fc618, 1 fix pass: daphne==4.2.2 en requirements; deviación TestCase->TransactionTestCase adjudicada como aceptada por async DB de channels/MySQL; suite 14/14)
 Task 6: complete (commits bdc0f0a5..566a8689, review clean; minor style nits: get_object idiomático vs hand-rolled 404 — no bloqueante)
+Task 7: complete (commits f36de4d7..f085c412, review clean; implementer se colgó sin commitear -> controller verificó (IntegrationTests 2/2, StateTransitionTests dirigido 1/1) y commiteó. PENDIENTE review final: correr suite backend COMPLETA off-hours (MySQL ~30-80s/test hace timeout la suite entera en 10 min).)
 
