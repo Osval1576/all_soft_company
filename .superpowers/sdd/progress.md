@@ -70,4 +70,5 @@ Task 5: complete (commits 3273c0a3..ec4fc618, 1 fix pass: daphne==4.2.2 en requi
 Task 6: complete (commits bdc0f0a5..566a8689, review clean; minor style nits: get_object idiomático vs hand-rolled 404 — no bloqueante)
 Task 7: complete (commits f36de4d7..f085c412, review clean; implementer se colgó sin commitear -> controller verificó (IntegrationTests 2/2, StateTransitionTests dirigido 1/1) y commiteó. PENDIENTE review final: correr suite backend COMPLETA off-hours (MySQL ~30-80s/test hace timeout la suite entera en 10 min).)
 Task 8: complete (commits 471b87bd..ec25bd80, build limpio, review approved). FINDINGS plan-mandated para fix wave final en notifications.store.js: (a) spread order `{toastId:id, ...n}` -> `{...n, toastId:id}`; (b) markRead/markAllRead no revierten el optimistic update si el POST falla (catch vacío); (c) backoff abandona tras 5 intentos sin recovery (igual que useWsConnection de chat — consistente, opcional).
+Task 9: complete (commits ba5cd4f7..912acc0e, build limpio, review approved; sólo nits cosméticos)
 
