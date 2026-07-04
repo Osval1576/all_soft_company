@@ -66,4 +66,5 @@ Task 1: complete (commits 22d9c222..b5e3fab3, review clean)
 Task 2: complete (commits a3849209..b92507d1, review clean)
 Task 3: complete (commits 05e12fa8..3f402645, review clean; minor nits: import os a media altura + falta newline final en settings.py — para barrido final)
 Task 4: complete (commits 94924643..1e865197, review clean; minor: sin logging en el except del group_send en services.py — considerar logger.exception en barrido final)
+Task 5: complete (commits 3273c0a3..ec4fc618, 1 fix pass: daphne==4.2.2 en requirements; deviación TestCase->TransactionTestCase adjudicada como aceptada por async DB de channels/MySQL; suite 14/14)
 
