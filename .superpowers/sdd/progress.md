@@ -113,5 +113,17 @@ Task 7: complete (commits a63efcac..4bf2b60d, build limpio, review approved; fil
 Task 8: complete (commits 4a8ac742..f86c5f18, build limpio, review approved; columnas 8/8, búsqueda combinada con filtros, sin filteredTickets colgado).
 Task 9: complete (commits 1497330a..fe17b413, build limpio, review approved; grid 2-col intacto, Pool/stats sin tocar). FINDING para fix wave final: el dropdown de orden del Técnico no alterna dirección (re-seleccionar la misma opción no dispara @change) -> queda asc por clave; el Admin sí alterna con headers.
 
-## Estado: 9/9 tasks completas. Pendiente: review final de rama + finishing-a-development-branch.
+## Estado: 9/9 tasks completas.
+
+Review final de rama (opus): **READY para merge** — sin merge-blockers (a diferencia de Fase 2). IDOR cerrado, sin fuga de MEDIA, best-effort aislado, objectURLs limpios, payload consistente end-to-end (serializer + message_to_payload). Backend sin cambios desde el full run de tickets_t 30/30 (Task 4); tasks 5-9 fueron sólo frontend. Corriendo suite backend COMPLETA en background como disciplina pre-merge.
+
+Follow-ups aceptados (NO bloquean; ciclo futuro):
+- Consumer text-path no usa message_to_payload (divergencia latente del "single source of truth") -> refactor: create_message devuelve el instance y broadcast vía message_to_payload. Agrupar con:
+- DRY can_access_ticket vs user_can_access_ticket del consumer -> que el consumer llame al helper.
+- prettySize duplicado (ChatPanel/MessageAttachment) -> util compartido.
+- alert() en errores de upload/download -> migrar a toast (Fase 2 ya tiene sistema de toasts).
+- Dropdown de orden del Técnico no alterna dirección (asc-only por clave) -> bind sortDir a control explícito.
+- Validador confía en content_type (mitigado por PIL.verify + %PDF) -> content-sniffing real en G.
+- Sin test de límites de tamaño (>2MB img / >10MB pdf).
+- nosniff header en download + trailing newlines -> G/hardening.
 
