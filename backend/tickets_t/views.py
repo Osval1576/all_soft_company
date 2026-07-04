@@ -6,6 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import transaction
+from django.http import FileResponse
 from django.core.exceptions import ValidationError as DjangoValidationError
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -182,3 +183,21 @@ class TicketViewSet(viewsets.ModelViewSet):
             logger.exception("notification dispatch failed for ticket %s", ticket.id)
 
         return Response(payload, status=201)
+
+    @action(detail=True, methods=["get"],
+            url_path=r"attachments/(?P<message_id>[^/.]+)/download")
+    def download_attachment(self, request, pk=None, message_id=None):
+        ticket = Ticket.objects.filter(pk=pk).first()
+        if ticket is None:
+            return Response({"detail": "No encontrado."}, status=404)
+        if not can_access_ticket(request.user, ticket):
+            return Response({"detail": "Sin acceso al ticket."}, status=403)
+        msg = TicketMessage.objects.filter(pk=message_id, ticket=ticket).first()
+        if msg is None or not msg.attachment:
+            return Response({"detail": "Adjunto no encontrado."}, status=404)
+        resp = FileResponse(
+            msg.attachment.open("rb"),
+            content_type=msg.attachment_content_type or "application/octet-stream",
+        )
+        resp["Content-Disposition"] = f'attachment; filename="{msg.attachment_name}"'
+        return resp

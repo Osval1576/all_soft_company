@@ -317,3 +317,45 @@ class UploadAttachmentTests(TestCase):
             f"/api/tickets_t/{self.ticket.id}/attachments/", {}, format="multipart",
         )
         self.assertEqual(r.status_code, 400)
+
+
+class DownloadAttachmentTests(TestCase):
+    def setUp(self):
+        self.agent = User.objects.create_user(username="dl_ag", password="x", role="AGENT")
+        self.customer = User.objects.create_user(username="dl_cu", password="x", role="CUSTOMER")
+        self.stranger = User.objects.create_user(username="dl_x", password="x", role="CUSTOMER")
+        self.ticket = Ticket.objects.create(
+            reference="ALS-20260101-000430", titulo="T", descripcion="d",
+            prioridad="MEDIUM", estado="OPEN",
+            creado_por=self.customer, asignado_a=self.agent,
+        )
+        from tickets_t.models import TicketMessage
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        f = SimpleUploadedFile("foto.png", _png_bytes(), content_type="image/png")
+        self.msg = TicketMessage.objects.create(
+            ticket=self.ticket, sender=self.customer, content="",
+            attachment=f, attachment_name="foto.png",
+            attachment_size=len(_png_bytes()), attachment_content_type="image/png",
+        )
+
+    def _client(self, user):
+        c = APIClient()
+        c.force_authenticate(user=user)
+        return c
+
+    def _url(self, mid=None):
+        return f"/api/tickets_t/{self.ticket.id}/attachments/{mid or self.msg.id}/download/"
+
+    def test_download_ok_for_participant(self):
+        r = self._client(self.customer).get(self._url())
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("foto.png", r["Content-Disposition"])
+        self.assertEqual(b"".join(r.streaming_content), _png_bytes())
+
+    def test_download_forbidden_for_stranger(self):
+        r = self._client(self.stranger).get(self._url())
+        self.assertEqual(r.status_code, 403)
+
+    def test_download_404_for_missing_message(self):
+        r = self._client(self.customer).get(self._url(mid=999999))
+        self.assertEqual(r.status_code, 404)
