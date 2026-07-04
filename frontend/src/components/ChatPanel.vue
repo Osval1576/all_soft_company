@@ -44,7 +44,8 @@
               <span v-if="m.sender_username !== me" class="bubble-sender">{{ m.sender_username }}</span>
               <span class="bubble-time">{{ formatTime(m.created_at) }}</span>
             </div>
-            <div class="bubble-content">{{ m.content }}</div>
+            <div v-if="m.content" class="bubble-content">{{ m.content }}</div>
+            <MessageAttachment v-if="m.attachment" :att="m.attachment" />
           </div>
         </div>
       </template>
@@ -98,6 +99,7 @@ import { useAuthStore } from "../stores/auth.store";
 import { useNotificationsStore } from "../stores/notifications.store";
 import { useWsConnection } from "../composables/useWsConnection";
 import TicketEventTimeline from "./tickets/TicketEventTimeline.vue";
+import MessageAttachment from "./tickets/MessageAttachment.vue";
 
 const props = defineProps({
   ticketId:        { type: Number, required: true },
