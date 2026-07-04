@@ -38,6 +38,7 @@ urlpatterns = [
     path("api/admin/landing/", include("landing_cms.admin_urls")),
     path("api/admin/site-settings/", v_settings_admin),
     path("api/", include("tickets_t.urls")),
+    path("api/", include("notifications.urls")),
     path("api/auth/login-cookie/", LoginCookieView.as_view(), name="login_cookie"),
     path("api/auth/refresh-cookie/", RefreshCookieView.as_view(), name="refresh_cookie"),
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),

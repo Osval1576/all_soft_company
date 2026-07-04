@@ -125,6 +125,56 @@ class DispatchTests(TestCase):
         self.assertEqual([m.to for m in mail.outbox], [["adm@x.com"]])
 
 
+from rest_framework.test import APIClient
+
+
+class ApiTests(TestCase):
+    def setUp(self):
+        self.customer = User.objects.create_user(username="apic", password="x", role="CUSTOMER", email="apic@x.com")
+        self.other = User.objects.create_user(username="apio", password="x", role="CUSTOMER", email="o@x.com")
+        self.ticket = Ticket.objects.create(
+            reference="ALS-20260101-000200", titulo="T", descripcion="d",
+            prioridad="MEDIUM", estado="OPEN", creado_por=self.customer,
+        )
+        self.n1 = Notification.objects.create(recipient=self.customer, kind="status_changed", ticket=self.ticket, title="A")
+        self.n2 = Notification.objects.create(recipient=self.customer, kind="status_changed", ticket=self.ticket, title="B")
+        Notification.objects.create(recipient=self.other, kind="status_changed", ticket=self.ticket, title="C")
+
+    def _client(self, user):
+        c = APIClient()
+        c.force_authenticate(user=user)
+        return c
+
+    def test_list_only_own(self):
+        r = self._client(self.customer).get("/api/notifications/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.json()), 2)
+
+    def test_mark_one_read(self):
+        r = self._client(self.customer).post(f"/api/notifications/{self.n1.id}/read/")
+        self.assertEqual(r.status_code, 200)
+        self.n1.refresh_from_db()
+        self.assertTrue(self.n1.is_read)
+
+    def test_cannot_read_others_notification(self):
+        r = self._client(self.other).post(f"/api/notifications/{self.n1.id}/read/")
+        self.assertEqual(r.status_code, 404)
+
+    def test_read_all(self):
+        r = self._client(self.customer).post("/api/notifications/read-all/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(Notification.objects.filter(recipient=self.customer, is_read=False).count(), 0)
+
+    def test_get_and_patch_preferences(self):
+        c = self._client(self.customer)
+        r = c.get("/api/notifications/preferences/")
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()["email_on_new_message"])
+        r2 = c.patch("/api/notifications/preferences/", {"email_on_new_message": False}, format="json")
+        self.assertEqual(r2.status_code, 200)
+        self.assertFalse(r2.json()["email_on_new_message"])
+
+
 class NotifyConsumerTests(TransactionTestCase):
     # TransactionTestCase (no atomic wrapper) en vez de TestCase: los tests async
     # usan database_sync_to_async, que hace close_old_connections() antes/despues
