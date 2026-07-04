@@ -1,10 +1,13 @@
 import json
+import logging
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
 
 from .models import Ticket, TicketMessage
+
+logger = logging.getLogger(__name__)
 
 
 class TicketChatConsumer(AsyncWebsocketConsumer):
@@ -89,7 +92,10 @@ class TicketChatConsumer(AsyncWebsocketConsumer):
             content=content,
         )
         from notifications.services import dispatch
-        dispatch("new_message", ticket, actor=user, extra={"content": content})
+        try:
+            dispatch("new_message", ticket, actor=user, extra={"content": content})
+        except Exception:
+            logger.exception("notification dispatch failed for ticket %s", self.ticket_id)
         return {
             "id": m.id,
             "sender_id": user.id,

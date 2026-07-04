@@ -1,3 +1,4 @@
+import logging
 import threading
 
 from asgiref.sync import async_to_sync
@@ -11,6 +12,8 @@ from .models import Notification, NotificationPreference
 from .presence import is_online
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
 
 STATUS_LABELS = {
     "OPEN": "Abierto", "IN_PROGRESS": "En proceso",
@@ -45,7 +48,7 @@ def _push(user_id, notification):
     try:
         async_to_sync(layer.group_send)(f"user_{user_id}", payload)
     except Exception:
-        pass
+        logger.exception("notify group_send failed for user_%s", user_id)
 
 
 def _send_email(recipient, subject, body):
