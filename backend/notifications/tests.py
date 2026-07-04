@@ -1,4 +1,4 @@
-from django.test import TestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.core import mail
 from tickets_t.models import Ticket
@@ -6,6 +6,10 @@ from notifications.models import Notification, NotificationPreference
 from notifications.presence import mark_online, is_online, mark_offline
 from notifications.emails import send_notification_email
 from notifications.services import dispatch
+from channels.testing import WebsocketCommunicator
+from channels.db import database_sync_to_async
+from config.asgi import application
+from rest_framework_simplejwt.tokens import AccessToken
 
 User = get_user_model()
 
@@ -119,3 +123,28 @@ class DispatchTests(TestCase):
         self.assertEqual(Notification.objects.filter(recipient=self.agent, kind="ticket_created").count(), 1)
         # email solo al admin (los agentes son aviso de pool, sin email)
         self.assertEqual([m.to for m in mail.outbox], [["adm@x.com"]])
+
+
+class NotifyConsumerTests(TransactionTestCase):
+    # TransactionTestCase (no atomic wrapper) en vez de TestCase: los tests async
+    # usan database_sync_to_async, que hace close_old_connections() antes/despues
+    # de cada llamada. Con TestCase (atomic por test), esto corrompe el estado del
+    # savepoint (needs_rollback queda True espuriamente) porque el cierre de
+    # conexiones no es compatible con el bloque atomic anidado en MySQL.
+    async def test_anonymous_rejected(self):
+        communicator = WebsocketCommunicator(application, "/ws/notify/")
+        connected, _ = await communicator.connect()
+        self.assertFalse(connected)
+
+    async def test_authed_connects_and_marks_online(self):
+        user = await database_sync_to_async(User.objects.create_user)(
+            username="wsu", password="x", role="CUSTOMER"
+        )
+        token = str(AccessToken.for_user(user))
+        communicator = WebsocketCommunicator(application, "/ws/notify/")
+        communicator.scope["headers"] = [(b"cookie", f"access={token}".encode())]
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+        online = await database_sync_to_async(is_online)(user.id)
+        self.assertTrue(online)
+        await communicator.disconnect()
