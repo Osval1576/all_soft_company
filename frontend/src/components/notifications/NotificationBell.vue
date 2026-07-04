@@ -1,6 +1,6 @@
 <template>
   <div class="bell-wrap">
-    <button class="bell-btn" @click="toggle" aria-label="Notificaciones">
+    <button class="bell-btn" @click.stop="toggle" aria-label="Notificaciones">
       <i class="ti ti-bell" aria-hidden="true"></i>
       <span v-if="store.unreadCount > 0" class="bell-badge">{{ badgeText }}</span>
     </button>
