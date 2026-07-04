@@ -238,3 +238,82 @@ class AccessAndPayloadTests(TestCase):
         # el serializer produce el mismo objeto attachment
         s = TicketMessageSerializer(m).data
         self.assertEqual(s["attachment"]["name"], "foto.png")
+
+
+from django.test import override_settings
+
+
+@override_settings(NOTIFICATIONS_EMAIL_ASYNC=False)
+class UploadAttachmentTests(TestCase):
+    def setUp(self):
+        self.agent = User.objects.create_user(username="up_ag", password="x", role="AGENT", email="a@x.com")
+        self.customer = User.objects.create_user(username="up_cu", password="x", role="CUSTOMER", email="c@x.com")
+        self.stranger = User.objects.create_user(username="up_x", password="x", role="CUSTOMER")
+        self.ticket = Ticket.objects.create(
+            reference="ALS-20260101-000420", titulo="T", descripcion="d",
+            prioridad="MEDIUM", estado="IN_PROGRESS",
+            creado_por=self.customer, asignado_a=self.agent,
+        )
+
+    def _client(self, user):
+        c = APIClient()
+        c.force_authenticate(user=user)
+        return c
+
+    def _png(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        return SimpleUploadedFile("foto.png", _png_bytes(), content_type="image/png")
+
+    def test_upload_creates_message_with_attachment(self):
+        from tickets_t.models import TicketMessage
+        r = self._client(self.customer).post(
+            f"/api/tickets_t/{self.ticket.id}/attachments/",
+            {"file": self._png(), "content": "mirá esto"}, format="multipart",
+        )
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json()["attachment"]["name"], "foto.png")
+        self.assertTrue(r.json()["attachment"]["is_image"])
+        self.assertEqual(r.json()["content"], "mirá esto")
+        m = TicketMessage.objects.get(id=r.json()["id"])
+        self.assertEqual(m.sender, self.customer)
+        self.assertTrue(m.attachment)
+
+    def test_upload_attachment_only_no_caption(self):
+        r = self._client(self.agent).post(
+            f"/api/tickets_t/{self.ticket.id}/attachments/",
+            {"file": self._png()}, format="multipart",
+        )
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json()["content"], "")
+
+    def test_upload_notifies_other_party(self):
+        from notifications.models import Notification
+        self._client(self.customer).post(
+            f"/api/tickets_t/{self.ticket.id}/attachments/",
+            {"file": self._png()}, format="multipart",
+        )
+        self.assertEqual(
+            Notification.objects.filter(recipient=self.agent, kind="new_message").count(), 1
+        )
+
+    def test_upload_forbidden_for_stranger(self):
+        r = self._client(self.stranger).post(
+            f"/api/tickets_t/{self.ticket.id}/attachments/",
+            {"file": self._png()}, format="multipart",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_upload_rejects_bad_type(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        bad = SimpleUploadedFile("x.txt", b"hola", content_type="text/plain")
+        r = self._client(self.customer).post(
+            f"/api/tickets_t/{self.ticket.id}/attachments/",
+            {"file": bad}, format="multipart",
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_upload_missing_file(self):
+        r = self._client(self.customer).post(
+            f"/api/tickets_t/{self.ticket.id}/attachments/", {}, format="multipart",
+        )
+        self.assertEqual(r.status_code, 400)
