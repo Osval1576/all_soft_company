@@ -89,3 +89,17 @@ Follow-ups aceptados por el review final (NO bloquean merge; para un ciclo poste
 - Bell dropdown a11y (Escape/role=dialog).
 - CAVEAT deploy (release notes): LocMemCache + InMemoryChannelLayer son per-process; NO mergear a entorno multi-proceso hasta Redis (sub-proyecto G).
 
+Fase 2 mergeada a main (merge 1c1f1ed2) y pusheada a origin/main el 2026-07-04.
+
+---
+
+# Sub-proyecto Dashboards v2 · Fase 3 (Enriquecimiento)
+
+Branch: feat/dashboards-v2-fase3-enriquecimiento (creada desde main en 4499e6a2 el 2026-07-04).
+Plan: docs/superpowers/plans/2026-07-04-dashboards-v2-fase3-enriquecimiento.md
+Spec: docs/superpowers/specs/2026-07-04-dashboards-v2-fase3-enriquecimiento-design.md
+
+Pre-flight: nit DRY conocido — can_access_ticket (T2) coexiste con user_can_access_ticket del consumer; el plan no refactoriza el consumer. Para triaje en el review.
+
+## Completed tasks
+
