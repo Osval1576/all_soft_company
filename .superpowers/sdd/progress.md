@@ -89,3 +89,41 @@ Follow-ups aceptados por el review final (NO bloquean merge; para un ciclo poste
 - Bell dropdown a11y (Escape/role=dialog).
 - CAVEAT deploy (release notes): LocMemCache + InMemoryChannelLayer son per-process; NO mergear a entorno multi-proceso hasta Redis (sub-proyecto G).
 
+Fase 2 mergeada a main (merge 1c1f1ed2) y pusheada a origin/main el 2026-07-04.
+
+---
+
+# Sub-proyecto Dashboards v2 · Fase 3 (Enriquecimiento)
+
+Branch: feat/dashboards-v2-fase3-enriquecimiento (creada desde main en 4499e6a2 el 2026-07-04).
+Plan: docs/superpowers/plans/2026-07-04-dashboards-v2-fase3-enriquecimiento.md
+Spec: docs/superpowers/specs/2026-07-04-dashboards-v2-fase3-enriquecimiento-design.md
+
+Pre-flight: nit DRY conocido — can_access_ticket (T2) coexiste con user_can_access_ticket del consumer; el plan no refactoriza el consumer. Para triaje en el review.
+
+## Completed tasks
+
+Task 1: complete (commits e4853af0..c2c1cea7, review clean; fixture PNG del brief estaba corrupta -> reemplazada por PNG 1x1 válido en _png_bytes(); 4/4 + suite tickets_t 18/18). Minors informativos: validador confía en content-type (mitigado por PIL.verify + firma %PDF); sin test de límites de tamaño (heredado del brief) — para barrido final.
+Task 2: complete (commits 22087974..5184509f, review approved; 3/3 + suite 21/21). FINDING para fix wave final: DRY — can_access_ticket (permissions.py) duplica user_can_access_ticket del consumer; consolidar (que el consumer llame al helper). Plan lo dejó fuera de scope a propósito.
+Task 3: complete (commits d0719073..72149227, review approved; 6/6 + suite 27/27; broadcast+dispatch best-effort aislados, notif test verifica fila real). Sólo nits triviales.
+Task 4: complete (commits aafb1571..c27d9a72, review approved; 3/3 + suite 30/30; IDOR cerrado con filter(pk, ticket), bytes verificados byte-a-byte). Backend de adjuntos completo.
+Task 5: complete (commits 4099af53..80ff7b33, build limpio, review approved; sin duplicado local+WS, canSend correcto). Minor plan-mandated: error de upload usa alert() en vez de toast/inline — para barrido final si se quiere pulir.
+Task 6: complete (commits 1dcef3d0..2e101c3e, build limpio, review approved; cross-origin OK — imágenes/PDF vía fetch-blob, objectURLs revocados). Adjuntos completo T1-T6. Minor DRY: prettySize duplicado en ChatPanel.vue y MessageAttachment.vue — para barrido final.
+Task 7: complete (commits a63efcac..4bf2b60d, build limpio, review approved; filtro/orden sólido). Minors inherentes al plan: NaN en fechas inválidas / prioridad desconocida -> rank -1 (ok para datos bien formados).
+Task 8: complete (commits 4a8ac742..f86c5f18, build limpio, review approved; columnas 8/8, búsqueda combinada con filtros, sin filteredTickets colgado).
+Task 9: complete (commits 1497330a..fe17b413, build limpio, review approved; grid 2-col intacto, Pool/stats sin tocar). FINDING para fix wave final: el dropdown de orden del Técnico no alterna dirección (re-seleccionar la misma opción no dispara @change) -> queda asc por clave; el Admin sí alterna con headers.
+
+## Estado: 9/9 tasks completas.
+
+Review final de rama (opus): **READY para merge** — sin merge-blockers (a diferencia de Fase 2). IDOR cerrado, sin fuga de MEDIA, best-effort aislado, objectURLs limpios, payload consistente end-to-end (serializer + message_to_payload). Backend sin cambios desde el full run de tickets_t 30/30 (Task 4); tasks 5-9 fueron sólo frontend. Suite backend COMPLETA corrida (background, 925s) -> **81/81 OK** (65 Fase 2 + 16 adjuntos), cero regresiones. Rama merge-ready.
+
+Follow-ups aceptados (NO bloquean; ciclo futuro):
+- Consumer text-path no usa message_to_payload (divergencia latente del "single source of truth") -> refactor: create_message devuelve el instance y broadcast vía message_to_payload. Agrupar con:
+- DRY can_access_ticket vs user_can_access_ticket del consumer -> que el consumer llame al helper.
+- prettySize duplicado (ChatPanel/MessageAttachment) -> util compartido.
+- alert() en errores de upload/download -> migrar a toast (Fase 2 ya tiene sistema de toasts).
+- Dropdown de orden del Técnico no alterna dirección (asc-only por clave) -> bind sortDir a control explícito.
+- Validador confía en content_type (mitigado por PIL.verify + %PDF) -> content-sniffing real en G.
+- Sin test de límites de tamaño (>2MB img / >10MB pdf).
+- nosniff header en download + trailing newlines -> G/hardening.
+

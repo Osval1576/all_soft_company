@@ -36,26 +36,48 @@
       </div>
 
       <div v-if="activeTab === 'mine'" class="main-area">
-        <aside class="ticket-list">
-          <div v-if="loading" class="list-state">Cargando...</div>
-          <template v-else>
-            <div v-if="mine.length === 0" class="list-state">No tienes tickets asignados.</div>
-            <button
-              v-for="t in mine"
-              :key="t.id"
-              class="ticket-item"
-              :class="{ 'ticket-item--active': selectedTicket?.id === t.id }"
-              @click="selectedTicket = t"
-            >
-              <div class="ticket-item-top">
-                <PriorityDot :priority="t.prioridad" />
-                <span class="ticket-ref">{{ t.reference }}</span>
-                <StatusBadge :status="t.estado" />
-              </div>
-              <div class="ticket-title">{{ t.titulo }}</div>
-            </button>
-          </template>
-        </aside>
+        <div class="mine-col">
+          <div class="mine-controls">
+            <select v-model="tf.estado.value" class="inline-select">
+              <option value="">Estado: todos</option>
+              <option value="OPEN">Abierto</option>
+              <option value="IN_PROGRESS">En proceso</option>
+              <option value="RESOLVED">Resuelto</option>
+              <option value="CLOSED">Cerrado</option>
+            </select>
+            <select v-model="tf.prioridad.value" class="inline-select">
+              <option value="">Prioridad: todas</option>
+              <option value="LOW">Baja</option>
+              <option value="MEDIUM">Media</option>
+              <option value="HIGH">Alta</option>
+              <option value="URGENT">Urgente</option>
+            </select>
+            <select :value="tf.sortKey.value" @change="tf.toggleSort($event.target.value)" class="inline-select">
+              <option value="prioridad">Orden: prioridad</option>
+              <option value="created_at">Orden: fecha</option>
+            </select>
+          </div>
+          <aside class="ticket-list">
+            <div v-if="loading" class="list-state">Cargando...</div>
+            <template v-else>
+              <div v-if="tf.result.length === 0" class="list-state">No tienes tickets asignados.</div>
+              <button
+                v-for="t in tf.result"
+                :key="t.id"
+                class="ticket-item"
+                :class="{ 'ticket-item--active': selectedTicket?.id === t.id }"
+                @click="selectedTicket = t"
+              >
+                <div class="ticket-item-top">
+                  <PriorityDot :priority="t.prioridad" />
+                  <span class="ticket-ref">{{ t.reference }}</span>
+                  <StatusBadge :status="t.estado" />
+                </div>
+                <div class="ticket-title">{{ t.titulo }}</div>
+              </button>
+            </template>
+          </aside>
+        </div>
 
         <main class="chat-area">
           <div v-if="!selectedTicket" class="empty-chat">
@@ -88,6 +110,7 @@ import PoolList from "../../components/tickets/PoolList.vue";
 import StatusBadge from "../../components/StatusBadge.vue";
 import PriorityDot from "../../components/PriorityDot.vue";
 import { listMyTickets, updateTicket, getPool, takeTicket } from "../../api/tickets.api";
+import { useTicketFilters } from "../../composables/useTicketFilters.js";
 
 const TABS = [
   { id: "mine", label: "Mis tickets" },
@@ -100,6 +123,8 @@ const loadingPool = ref(false);
 const mine = ref([]);
 const pool = ref([]);
 const selectedTicket = ref(null);
+
+const tf = useTicketFilters(mine);
 
 const stats = computed(() => {
   const now = new Date();
@@ -221,6 +246,18 @@ onMounted(async () => {
 }
 
 .main-area { flex: 1; min-height: 0; display: grid; grid-template-columns: 320px 1fr; gap: 12px; }
+.mine-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.mine-col .ticket-list { flex: 1; }
+.mine-controls { display: flex; gap: 6px; flex-shrink: 0; }
+.mine-controls .inline-select {
+  flex: 1;
+  padding: 6px 8px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+}
 .ticket-list {
   background: var(--surface);
   border: 0.5px solid var(--border);

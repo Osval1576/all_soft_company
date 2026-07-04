@@ -44,7 +44,8 @@
               <span v-if="m.sender_username !== me" class="bubble-sender">{{ m.sender_username }}</span>
               <span class="bubble-time">{{ formatTime(m.created_at) }}</span>
             </div>
-            <div class="bubble-content">{{ m.content }}</div>
+            <div v-if="m.content" class="bubble-content">{{ m.content }}</div>
+            <MessageAttachment v-if="m.attachment" :att="m.attachment" />
           </div>
         </div>
       </template>
@@ -52,17 +53,39 @@
 
     <footer class="composer">
       <input
-        v-model="draft"
-        @keydown.enter.prevent="send"
-        :placeholder="composerPlaceholder"
-        class="composer-input"
-        :disabled="wsStatus === 'disconnected'"
+        ref="fileInput"
+        type="file"
+        accept="image/jpeg,image/png,image/webp,application/pdf"
+        class="file-hidden"
+        @change="onFilePicked"
       />
       <button
+        class="clip-btn"
+        :disabled="wsStatus === 'disconnected' || uploading"
+        @click="fileInput?.click()"
+        aria-label="Adjuntar archivo"
+      >📎</button>
+
+      <div class="composer-main">
+        <div v-if="pendingFile" class="pending-chip">
+          <span class="pending-name">{{ pendingFile.name }}</span>
+          <span class="pending-size">{{ prettySize(pendingFile.size) }}</span>
+          <button class="pending-remove" @click="clearPending" aria-label="Quitar">✕</button>
+        </div>
+        <input
+          v-model="draft"
+          @keydown.enter.prevent="send"
+          :placeholder="pendingFile ? 'Agregá un comentario (opcional)…' : composerPlaceholder"
+          class="composer-input"
+          :disabled="wsStatus === 'disconnected' && !pendingFile"
+        />
+      </div>
+
+      <button
         @click="send"
-        :disabled="!draft.trim() || wsStatus !== 'connected'"
+        :disabled="!canSend"
         class="composer-btn"
-      >Enviar</button>
+      >{{ uploading ? 'Subiendo…' : 'Enviar' }}</button>
     </footer>
 
     <TicketEventTimeline :events="events" />
@@ -71,11 +94,12 @@
 
 <script setup>
 import { nextTick, ref, watch, computed, onBeforeUnmount } from "vue";
-import { getTicketMessages, getTicketEvents } from "../api/tickets.api";
+import { getTicketMessages, getTicketEvents, uploadAttachment } from "../api/tickets.api";
 import { useAuthStore } from "../stores/auth.store";
 import { useNotificationsStore } from "../stores/notifications.store";
 import { useWsConnection } from "../composables/useWsConnection";
 import TicketEventTimeline from "./tickets/TicketEventTimeline.vue";
+import MessageAttachment from "./tickets/MessageAttachment.vue";
 
 const props = defineProps({
   ticketId:        { type: Number, required: true },
@@ -96,6 +120,28 @@ const events = ref([]);
 const loading = ref(false);
 const draft = ref("");
 const messagesEl = ref(null);
+
+const fileInput = ref(null);
+const pendingFile = ref(null);
+const uploading = ref(false);
+
+const canSend = computed(() => {
+  if (uploading.value) return false;
+  if (pendingFile.value) return true;
+  return !!draft.value.trim() && wsStatus.value === "connected";
+});
+
+function onFilePicked(e) {
+  const f = e.target.files?.[0];
+  if (f) pendingFile.value = f;
+  e.target.value = "";
+}
+function clearPending() { pendingFile.value = null; }
+function prettySize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
 
 const CONN_LABEL = {
   connecting: "Conectando…",
@@ -149,7 +195,21 @@ async function loadAll() {
   }
 }
 
-function send() {
+async function send() {
+  if (pendingFile.value) {
+    uploading.value = true;
+    try {
+      // El mensaje llega por WS (broadcast del backend); no lo insertamos localmente.
+      await uploadAttachment(props.ticketId, pendingFile.value, draft.value.trim());
+      pendingFile.value = null;
+      draft.value = "";
+    } catch (err) {
+      alert(err?.response?.data?.detail || "No se pudo subir el archivo.");
+    } finally {
+      uploading.value = false;
+    }
+    return;
+  }
   const text = draft.value.trim();
   if (!text) return;
   if (wsSend({ content: text })) {
@@ -316,4 +376,30 @@ onBeforeUnmount(() => notif.setActiveTicket(null));
 }
 .composer-btn:hover:not(:disabled) { background: var(--accent-hover); }
 .composer-btn:disabled { opacity: .4; cursor: not-allowed; }
+.file-hidden { display: none; }
+.clip-btn {
+  flex-shrink: 0;
+  width: 38px; height: 38px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  cursor: pointer;
+  font-size: 16px;
+}
+.clip-btn:hover:not(:disabled) { background: var(--border); }
+.clip-btn:disabled { opacity: .4; cursor: not-allowed; }
+.composer-main { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.pending-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 8px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  font-size: 12px;
+  align-self: flex-start;
+}
+.pending-name { color: var(--text); font-weight: 500; }
+.pending-size { color: var(--text-3); font-family: var(--font-mono); font-size: 10px; }
+.pending-remove { color: var(--text-3); font-size: 11px; }
+.pending-remove:hover { color: var(--c-urgent); }
 </style>

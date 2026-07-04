@@ -1,9 +1,20 @@
+import os
+import uuid
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+from .validators import validate_attachment
+
+
+def attachment_upload_to(instance, filename):
+    ext = os.path.splitext(filename)[1].lower()
+    now = timezone.now()
+    return f"ticket_adjuntos/{now:%Y/%m}/{uuid.uuid4().hex}{ext}"
 
 
 
@@ -60,6 +71,13 @@ class TicketMessage(models.Model):
     ticket = models.ForeignKey("tickets_t.Ticket", on_delete=models.CASCADE, related_name="messages")
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_messages")
     content = models.TextField()
+    attachment = models.FileField(
+        upload_to=attachment_upload_to, null=True, blank=True,
+        validators=[validate_attachment],
+    )
+    attachment_name = models.CharField(max_length=255, blank=True)
+    attachment_size = models.PositiveIntegerField(null=True, blank=True)
+    attachment_content_type = models.CharField(max_length=100, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

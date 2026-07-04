@@ -1,14 +1,26 @@
+import logging
+
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import transaction
+from django.http import FileResponse
+from django.core.exceptions import ValidationError as DjangoValidationError
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 from .models import Ticket, TicketMessage, TicketEvent
 from .serializers import (
     TicketSerializer, TicketCreateSerializer, TicketMessageSerializer,
     TicketEventSerializer,
 )
+from .validators import validate_attachment
+from .permissions import can_access_ticket
+from .payloads import message_to_payload
+
+logger = logging.getLogger(__name__)
 
 
 def _role(user):
@@ -124,3 +136,68 @@ class TicketViewSet(viewsets.ModelViewSet):
     def events(self, request, pk=None):
         ticket = self.get_object()
         return Response(TicketEventSerializer(ticket.events.all(), many=True).data)
+
+    # ---- attachments ----
+    @action(detail=True, methods=["post"], url_path="attachments",
+            parser_classes=[MultiPartParser, FormParser])
+    def upload_attachment(self, request, pk=None):
+        ticket = Ticket.objects.filter(pk=pk).first()
+        if ticket is None:
+            return Response({"detail": "No encontrado."}, status=404)
+        if not can_access_ticket(request.user, ticket):
+            return Response({"detail": "Sin acceso al ticket."}, status=403)
+        file = request.FILES.get("file")
+        if not file:
+            return Response({"detail": "Falta el archivo."}, status=400)
+        try:
+            validate_attachment(file)
+        except DjangoValidationError as e:
+            return Response({"detail": e.messages[0]}, status=400)
+
+        caption = (request.data.get("content") or "").strip()
+        msg = TicketMessage.objects.create(
+            ticket=ticket,
+            sender=request.user,
+            content=caption,
+            attachment=file,
+            attachment_name=file.name[:255],
+            attachment_size=file.size,
+            attachment_content_type=getattr(file, "content_type", "") or "",
+        )
+        payload = message_to_payload(msg)
+
+        layer = get_channel_layer()
+        if layer is not None:
+            try:
+                async_to_sync(layer.group_send)(
+                    f"ticket_{ticket.id}", {"type": "chat.message", "message": payload}
+                )
+            except Exception:
+                logger.exception("attachment broadcast failed for ticket %s", ticket.id)
+
+        from notifications.services import dispatch
+        try:
+            dispatch("new_message", ticket, actor=request.user,
+                     extra={"content": caption or file.name})
+        except Exception:
+            logger.exception("notification dispatch failed for ticket %s", ticket.id)
+
+        return Response(payload, status=201)
+
+    @action(detail=True, methods=["get"],
+            url_path=r"attachments/(?P<message_id>[^/.]+)/download")
+    def download_attachment(self, request, pk=None, message_id=None):
+        ticket = Ticket.objects.filter(pk=pk).first()
+        if ticket is None:
+            return Response({"detail": "No encontrado."}, status=404)
+        if not can_access_ticket(request.user, ticket):
+            return Response({"detail": "Sin acceso al ticket."}, status=403)
+        msg = TicketMessage.objects.filter(pk=message_id, ticket=ticket).first()
+        if msg is None or not msg.attachment:
+            return Response({"detail": "Adjunto no encontrado."}, status=404)
+        resp = FileResponse(
+            msg.attachment.open("rb"),
+            content_type=msg.attachment_content_type or "application/octet-stream",
+        )
+        resp["Content-Disposition"] = f'attachment; filename="{msg.attachment_name}"'
+        return resp

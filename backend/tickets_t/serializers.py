@@ -132,26 +132,22 @@ class TicketCreateSerializer(serializers.ModelSerializer):
 class TicketMessageSerializer(serializers.ModelSerializer):
     sender_username = serializers.CharField(source="sender.username", read_only=True)
     sender_role = serializers.CharField(source="sender.role", read_only=True)
+    attachment = serializers.SerializerMethodField()
 
     class Meta:
         model = TicketMessage
         fields = [
-            "id",
-            "ticket",
-            "sender",
-            "sender_username",
-            "sender_role",
-            "content",
-            "created_at",
+            "id", "ticket", "sender", "sender_username", "sender_role",
+            "content", "created_at", "attachment",
         ]
         read_only_fields = [
-            "id",
-            "ticket",
-            "sender",
-            "sender_username",
-            "sender_role",
-            "created_at",
+            "id", "ticket", "sender", "sender_username", "sender_role",
+            "created_at", "attachment",
         ]
+
+    def get_attachment(self, obj):
+        from .payloads import attachment_payload
+        return attachment_payload(obj)
 
 
 class TicketEventSerializer(serializers.ModelSerializer):
