@@ -48,3 +48,16 @@ export async function getTicketEvents(id) {
   const res = await http.get(`/api/tickets_t/${id}/events/`);
   return res.data;
 }
+
+export async function uploadAttachment(ticketId, file, caption) {
+  const form = new FormData();
+  form.append("file", file);
+  if (caption) form.append("content", caption);
+  const res = await http.post(`/api/tickets_t/${ticketId}/attachments/`, form);
+  return res.data;
+}
+
+export async function fetchAttachmentBlob(url) {
+  const res = await http.get(url, { responseType: "blob" });
+  return res.data;
+}
