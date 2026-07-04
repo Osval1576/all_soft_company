@@ -198,3 +198,45 @@ class NotifyConsumerTests(TransactionTestCase):
         online = await database_sync_to_async(is_online)(user.id)
         self.assertTrue(online)
         await communicator.disconnect()
+
+
+@override_settings(NOTIFICATIONS_EMAIL_ASYNC=False)
+class IntegrationTests(TransactionTestCase):
+    # TransactionTestCase en vez de TestCase: test_message_creates_notification_for_other_party
+    # ejecuta create_message vía async_to_sync, que está envuelto en @database_sync_to_async
+    # (channels.db). Ese wrapper hace close_old_connections() antes/después de la llamada,
+    # lo cual corrompe el savepoint del bloque atomic de TestCase en MySQL (mismo problema
+    # documentado en NotifyConsumerTests, Task 5).
+    def setUp(self):
+        self.agent = User.objects.create_user(username="iag", password="x", role="AGENT", email="iag@x.com")
+        self.customer = User.objects.create_user(username="icu", password="x", role="CUSTOMER", email="icu@x.com")
+        self.ticket = Ticket.objects.create(
+            reference="ALS-20260101-000300", titulo="T", descripcion="d",
+            prioridad="MEDIUM", estado="IN_PROGRESS",
+            creado_por=self.customer, asignado_a=self.agent,
+        )
+
+    def _client(self, user):
+        c = APIClient()
+        c.force_authenticate(user=user)
+        return c
+
+    def test_resolving_ticket_notifies_customer(self):
+        r = self._client(self.agent).patch(
+            f"/api/tickets_t/{self.ticket.id}/", {"estado": "RESOLVED"}, format="json"
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(
+            Notification.objects.filter(recipient=self.customer, kind="status_changed").count(), 1
+        )
+
+    def test_message_creates_notification_for_other_party(self):
+        from asgiref.sync import async_to_sync
+        from tickets_t.consumers import TicketChatConsumer
+        consumer = TicketChatConsumer()
+        # create_message está envuelto por @database_sync_to_async: async_to_sync
+        # lo ejecuta hasta completarse (corre el path real, incluido el dispatch).
+        async_to_sync(consumer.create_message)(self.customer.id, self.ticket.id, "hola")
+        self.assertEqual(
+            Notification.objects.filter(recipient=self.agent, kind="new_message").count(), 1
+        )

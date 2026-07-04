@@ -88,6 +88,8 @@ class TicketChatConsumer(AsyncWebsocketConsumer):
             sender=user,
             content=content,
         )
+        from notifications.services import dispatch
+        dispatch("new_message", ticket, actor=user, extra={"content": content})
         return {
             "id": m.id,
             "sender_id": user.id,
