@@ -23,17 +23,45 @@
       <div v-if="activeTab === 'tickets'" class="tab-content">
         <div class="toolbar">
           <input v-model="ticketSearch" placeholder="Buscar ticket..." class="search-input" />
+          <select v-model="tf.estado.value" class="inline-select">
+            <option value="">Estado: todos</option>
+            <option value="OPEN">Abierto</option>
+            <option value="IN_PROGRESS">En proceso</option>
+            <option value="RESOLVED">Resuelto</option>
+            <option value="CLOSED">Cerrado</option>
+          </select>
+          <select v-model="tf.prioridad.value" class="inline-select">
+            <option value="">Prioridad: todas</option>
+            <option value="LOW">Baja</option>
+            <option value="MEDIUM">Media</option>
+            <option value="HIGH">Alta</option>
+            <option value="URGENT">Urgente</option>
+          </select>
+          <select v-model="tf.asignado.value" class="inline-select">
+            <option value="">Asignado: todos</option>
+            <option value="none">Sin asignar</option>
+            <option v-for="a in agents" :key="a.id" :value="String(a.id)">{{ a.username }}</option>
+          </select>
           <button @click="loadAll" class="btn-refresh">&#8635; Actualizar</button>
         </div>
         <div v-if="loading" class="loading-state">Cargando...</div>
         <div v-else class="data-table-wrap">
           <table class="data-table">
             <thead>
-              <tr><th>Referencia</th><th>Título</th><th>Estado</th><th>Prioridad</th><th>Creado por</th><th>Asignado a</th><th>Asignar agente</th></tr>
+              <tr>
+                <th class="th-sort" @click="tf.toggleSort('reference')">Referencia <span class="sort-ind">{{ sortInd('reference') }}</span></th>
+                <th>Título</th>
+                <th class="th-sort" @click="tf.toggleSort('estado')">Estado <span class="sort-ind">{{ sortInd('estado') }}</span></th>
+                <th class="th-sort" @click="tf.toggleSort('prioridad')">Prioridad <span class="sort-ind">{{ sortInd('prioridad') }}</span></th>
+                <th>Creado por</th>
+                <th>Asignado a</th>
+                <th class="th-sort" @click="tf.toggleSort('created_at')">Fecha <span class="sort-ind">{{ sortInd('created_at') }}</span></th>
+                <th>Asignar agente</th>
+              </tr>
             </thead>
             <tbody>
-              <tr v-if="filteredTickets.length === 0"><td colspan="7" class="empty-cell">Sin resultados.</td></tr>
-              <tr v-for="t in filteredTickets" :key="t.id">
+              <tr v-if="tf.result.length === 0"><td colspan="8" class="empty-cell">Sin resultados.</td></tr>
+              <tr v-for="t in tf.result" :key="t.id">
                 <td><span class="mono">{{ t.reference }}</span></td>
                 <td class="td-title">{{ t.titulo }}</td>
                 <td>
@@ -47,6 +75,7 @@
                 <td><div class="priority-cell"><PriorityDot :priority="t.prioridad" /><span>{{ PRIORITY_LABELS[t.prioridad] }}</span></div></td>
                 <td>{{ userName(t.creado_por) }}</td>
                 <td>{{ t.asignado_a ? userName(t.asignado_a) : '—' }}</td>
+                <td class="mono">{{ formatDate(t.created_at) }}</td>
                 <td>
                   <select :value="t.asignado_a ?? ''" @change="patchTicket(t, { asignado_a: $event.target.value || null })" class="inline-select">
                     <option value="">Sin asignar</option>
@@ -127,6 +156,7 @@ import { computed, onMounted, ref } from "vue";
 import AppTopBar from "../../components/AppTopBar.vue";
 import PriorityDot from "../../components/PriorityDot.vue";
 import { listMyTickets, updateTicket, listUsers, createUser, deleteUser } from "../../api/tickets.api";
+import { useTicketFilters } from "../../composables/useTicketFilters.js";
 
 const TABS = [{ id: "tickets", label: "Tickets" }, { id: "users", label: "Usuarios" }];
 const PRIORITY_LABELS = { LOW: "Baja", MEDIUM: "Media", HIGH: "Alta", URGENT: "Urgente" };
@@ -144,10 +174,18 @@ const userFormError = ref("");
 const uForm = ref({ username: "", password: "", first_name: "", last_name: "", email: "", role: "CUSTOMER" });
 
 const agents = computed(() => users.value.filter(u => u.role === "AGENT" || u.is_staff));
-const filteredTickets = computed(() => {
+
+const searchedTickets = computed(() => {
   const q = ticketSearch.value.toLowerCase();
-  return q ? tickets.value.filter(t => t.titulo.toLowerCase().includes(q) || t.reference.toLowerCase().includes(q)) : tickets.value;
+  return q
+    ? tickets.value.filter(
+        (t) => t.titulo.toLowerCase().includes(q) || t.reference.toLowerCase().includes(q)
+      )
+    : tickets.value;
 });
+
+const tf = useTicketFilters(searchedTickets);
+
 const filteredUsers = computed(() => {
   const q = userSearch.value.toLowerCase();
   return q ? users.value.filter(u => u.username.toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q)) : users.value;
@@ -156,6 +194,15 @@ const userMap = computed(() => Object.fromEntries(users.value.map(u => [u.id, u]
 
 function count(status) { return tickets.value.filter(t => t.estado === status).length; }
 function userName(id) { return userMap.value[id]?.username ?? `#${id}`; }
+
+function sortInd(key) {
+  if (tf.sortKey.value !== key) return "";
+  return tf.sortDir.value === "asc" ? "▲" : "▼";
+}
+function formatDate(iso) {
+  try { return new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "2-digit" }); }
+  catch { return ""; }
+}
 
 async function loadAll() {
   loading.value = true;
@@ -230,6 +277,9 @@ onMounted(loadAll);
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tr:hover td { background: var(--surface-2); }
 .mono { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.5px; color: var(--text-2); }
+.th-sort { cursor: pointer; user-select: none; }
+.th-sort:hover { color: var(--text); }
+.sort-ind { font-size: 9px; color: var(--accent); }
 .td-title { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .inline-select { padding: 4px 8px; border: 0.5px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); color: var(--text); font-size: 12px; cursor: pointer; transition: border-color .15s; }
 .inline-select:focus { border-color: var(--accent); outline: none; }
