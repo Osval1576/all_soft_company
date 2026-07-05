@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from tickets_t.models import Ticket
 from sla.models import SlaConfig, SlaPolicy, Holiday, TicketSla
 from sla.calendar_engine import Calendar, add_business_time, business_minutes_between
+from sla.levels import compute_levels
 
 User = get_user_model()
 
@@ -101,3 +102,43 @@ class CalendarTests(TestCase):
         a = _mx(2026, 1, 5, 7, 0)
         b = _mx(2026, 1, 5, 20, 0)
         self.assertEqual(business_minutes_between(a, b, _cal()), 540)
+
+
+class LevelTests(TestCase):
+    def setUp(self):
+        cu = User.objects.create_user(username="lc", password="x", role="CUSTOMER")
+        self.t = Ticket.objects.create(
+            reference="ALS-20260101-000510", titulo="T", descripcion="d",
+            prioridad="MEDIUM", estado="OPEN", creado_por=cu,
+        )
+
+    def _sla(self, **kw):
+        from sla.models import TicketSla
+        defaults = dict(
+            ticket=self.t, first_response_budget_min=120, resolution_budget_min=960,
+        )
+        defaults.update(kw)
+        return TicketSla(**defaults)
+
+    def test_met_when_met_at_set(self):
+        now = _mx(2026, 1, 5, 12, 0)
+        s = self._sla(first_response_met_at=_mx(2026, 1, 5, 11, 0),
+                      first_response_due_at=_mx(2026, 1, 5, 11, 30))
+        self.assertEqual(compute_levels(s, now, _cal())["fr"], "met")
+
+    def test_breached_when_now_past_due(self):
+        now = _mx(2026, 1, 5, 12, 0)
+        s = self._sla(first_response_due_at=_mx(2026, 1, 5, 11, 0))
+        self.assertEqual(compute_levels(s, now, _cal())["fr"], "breached")
+
+    def test_at_risk_within_threshold(self):
+        # presupuesto 120min, umbral 25% => 30min. Due a las 12:00, now 11:40 => quedan 20min laborales <=30 => at_risk
+        now = _mx(2026, 1, 5, 11, 40)
+        s = self._sla(first_response_due_at=_mx(2026, 1, 5, 12, 0))
+        self.assertEqual(compute_levels(s, now, _cal())["fr"], "at_risk")
+
+    def test_ok_when_plenty_left(self):
+        # quedan 110min > 30 => ok
+        now = _mx(2026, 1, 5, 10, 10)
+        s = self._sla(first_response_due_at=_mx(2026, 1, 5, 12, 0))
+        self.assertEqual(compute_levels(s, now, _cal())["fr"], "ok")
