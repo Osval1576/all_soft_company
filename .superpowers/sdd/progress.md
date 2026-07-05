@@ -142,3 +142,5 @@ F se descompone en F1(SLA)/F2(CSAT)/F3(métricas); este ciclo es F1.
 
 ## Completed tasks
 
+Task 1: complete (commits 6cd71bd8..2b2cb350, review approved; 3/3). Implementer murió sin commitear -> controller verificó (ModelTests 3/3) y commiteó. signals.py es stub intencional (Task 4 lo llena). Minor: import `settings` sin usar en models.py (heredado del plan) -> barrido final.
+
