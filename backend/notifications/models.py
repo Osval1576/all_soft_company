@@ -8,6 +8,8 @@ class Notification(models.Model):
         ASSIGNED = "assigned", "Asignado"
         NEW_MESSAGE = "new_message", "Nuevo mensaje"
         STATUS_CHANGED = "status_changed", "Cambio de estado"
+        SLA_AT_RISK = "sla_at_risk", "SLA en riesgo"
+        SLA_BREACHED = "sla_breached", "SLA vencido"
 
     recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications"

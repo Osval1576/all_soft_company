@@ -240,3 +240,30 @@ class IntegrationTests(TransactionTestCase):
         self.assertEqual(
             Notification.objects.filter(recipient=self.agent, kind="new_message").count(), 1
         )
+
+
+@override_settings(NOTIFICATIONS_EMAIL_ASYNC=False)
+class SlaNotificationTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username="sn_adm", password="x", role="ADMIN", email="adm@x.com")
+        self.agent = User.objects.create_user(username="sn_ag", password="x", role="AGENT", email="ag@x.com")
+        self.customer = User.objects.create_user(username="sn_cu", password="x", role="CUSTOMER")
+        self.ticket = Ticket.objects.create(
+            reference="ALS-20260101-000700", titulo="T", descripcion="d",
+            prioridad="HIGH", estado="OPEN", creado_por=self.customer, asignado_a=self.agent,
+        )
+
+    def test_sla_breached_notifies_agent_and_admins_in_app_only(self):
+        from notifications.services import dispatch
+        from notifications.models import Notification
+        dispatch("sla_breached", self.ticket, actor=None, extra={"clock": "resolución"})
+        self.assertEqual(Notification.objects.filter(recipient=self.agent, kind="sla_breached").count(), 1)
+        self.assertEqual(Notification.objects.filter(recipient=self.admin, kind="sla_breached").count(), 1)
+        # SLA es sólo in-app: sin emails
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_sla_at_risk_kind_routes(self):
+        from notifications.services import dispatch
+        from notifications.models import Notification
+        dispatch("sla_at_risk", self.ticket, actor=None, extra={"clock": "primera respuesta"})
+        self.assertEqual(Notification.objects.filter(kind="sla_at_risk").count(), 2)  # agent + admin
