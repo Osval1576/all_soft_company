@@ -127,3 +127,18 @@ Follow-ups aceptados (NO bloquean; ciclo futuro):
 - Sin test de límites de tamaño (>2MB img / >10MB pdf).
 - nosniff header en download + trailing newlines -> G/hardening.
 
+Fase 3 mergeada a main (merge 58f9161f) y pusheada a origin/main el 2026-07-04.
+
+---
+
+# Sub-proyecto SLA · F1 (Motor de SLA + semáforo)
+
+Branch: feat/sla-f1-motor (creada desde main en f1d56ad8 el 2026-07-04).
+Plan: docs/superpowers/plans/2026-07-04-sla-f1-motor.md
+Spec: docs/superpowers/specs/2026-07-04-sla-f1-motor-design.md
+
+Pre-flight fix: AppConfig renombrado a SlaAppConfig (evita colisión con el modelo SlaConfig).
+F se descompone en F1(SLA)/F2(CSAT)/F3(métricas); este ciclo es F1.
+
+## Completed tasks
+
