@@ -133,6 +133,29 @@ def _recipients_for(kind, ticket, actor, extra):
                 "offline_only": False,
             })
 
+    elif kind in ("sla_at_risk", "sla_breached"):
+        clock = (extra or {}).get("clock", "SLA")
+        if kind == "sla_at_risk":
+            title = f"SLA en riesgo: {ref}"
+            body = f"El ticket {ref} está por vencer su SLA de {clock}."
+        else:
+            title = f"SLA vencido: {ref}"
+            body = f"El ticket {ref} venció su SLA de {clock}."
+        targets = []
+        if ticket.asignado_a_id:
+            targets.append(ticket.asignado_a)
+        targets.extend(_admins())
+        seen = set()
+        for user in targets:
+            if user.id in seen:
+                continue
+            seen.add(user.id)
+            specs.append({
+                "user": user, "title": title, "body": body,
+                "email": False, "pref_field": None,
+                "subject": "", "email_body": "", "offline_only": False,
+            })
+
     return specs
 
 

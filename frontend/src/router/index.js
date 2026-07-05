@@ -14,6 +14,7 @@ import TechnicianInboxView from "../views/dashboards/TechnicianInboxView.vue";
 import AdminContent from "../views/admin/site/AdminContent.vue";
 import AdminTeam from "../views/admin/site/AdminTeam.vue";
 import AdminLocations from "../views/admin/site/AdminLocations.vue";
+import AdminSla from "../views/admin/sla/AdminSla.vue";
 import NotificationSettings from "../views/settings/NotificationSettings.vue";
 
 import { useAuthStore } from "../stores/auth.store";
@@ -31,6 +32,7 @@ const routes = [
   { path: "/tecnico", name: "tecnico", component: TechnicianDashboard, meta: { role: "AGENT" } },
   { path: "/tecnico/inbox", name: "tecnico-inbox", component: TechnicianInboxView, meta: { role: "AGENT" } },
   { path: "/admin", name: "admin", component: AdminDashboard, meta: { role: "ADMIN" } },
+  { path: "/admin/sla", name: "admin-sla", component: AdminSla, meta: { role: "ADMIN" } },
   { path: "/ajustes/notificaciones", name: "notif-settings", component: NotificationSettings, meta: { authed: true } },
   {
     path: "/admin/sitio",

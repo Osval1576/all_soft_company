@@ -127,3 +127,48 @@ Follow-ups aceptados (NO bloquean; ciclo futuro):
 - Sin test de límites de tamaño (>2MB img / >10MB pdf).
 - nosniff header en download + trailing newlines -> G/hardening.
 
+Fase 3 mergeada a main (merge 58f9161f) y pusheada a origin/main el 2026-07-04.
+
+---
+
+# Sub-proyecto SLA · F1 (Motor de SLA + semáforo)
+
+Branch: feat/sla-f1-motor (creada desde main en f1d56ad8 el 2026-07-04).
+Plan: docs/superpowers/plans/2026-07-04-sla-f1-motor.md
+Spec: docs/superpowers/specs/2026-07-04-sla-f1-motor-design.md
+
+Pre-flight fix: AppConfig renombrado a SlaAppConfig (evita colisión con el modelo SlaConfig).
+F se descompone en F1(SLA)/F2(CSAT)/F3(métricas); este ciclo es F1.
+
+## Completed tasks
+
+Task 1: complete (commits 6cd71bd8..2b2cb350, review approved; 3/3). Implementer murió sin commitear -> controller verificó (ModelTests 3/3) y commiteó. signals.py es stub intencional (Task 4 lo llena). El implementer revivió después, re-implementó de cero y confirmó byte-idéntico (sin dup). Minor: import `settings` sin usar en models.py (heredado del plan) -> barrido final.
+Task 2: complete (commits d9fc5e94..81fc3ebb, review approved; 8/8 calendario + suite 11/11, sin editar tests). FINDING Important LATENTE para review final: _start_of/_end_of usan aritmética wall-clock -> en TZ con DST, día de transición (23/25h) da ±1h de error. NO bloquea (default Mexico_City no observa DST desde 2022). Fix futuro: validar TZ no-DST o math DST-aware. Minors: minutes=0/negativos sin test/guarda.
+Task 3: complete (commits fb202cd7..c2bd6c54, review approved; 4/4 + suite 15/15; precedencia met>breached>at_risk>ok correcta, None-guard OK). Minors: gaps de cobertura heredados del brief (branch None, reloj res) — negligible.
+Task 4: complete (commits a2726f95..53f463eb, review approved; 6/6 + regresión sla+tickets_t 51/51). 2 fixes fuera de lista validados como correctos: (a) get_solo() refresh_from_db arregla bug real de Task 1 (TimeField default string no casteado en get_or_create -> rompía calendar_engine); (b) ajuste del test onetoone de Task 1 por colisión con el signal auto-create. Signals desacoplan sla<-tickets_t. Note: _agent_or_admin incluye is_superuser (consistente con el resto del codebase).
+Task 5: complete (commits ffac9d6f..d0b2fdab, review approved sin issues; 2/2 + notifications 23/23). SLA in-app only (email=False, no toca presence/prefs), dedup agente+admins. FINDING menor test-hygiene para review final: los TransactionTestCase de notifications truncan SlaPolicy sembrada -> el signal loguea "sin SlaPolicy para prioridad MEDIUM" (benigno, degradación elegante). Fix opcional: sembrar policy en esos tests o bajar el log level.
+Task 6: complete (commits accb21dc..66eb34ef, review approved; 2/2 + suite 23/23 + smoke check_sla OK). Idempotencia rank-based (advance-only, met skip, OPEN/IN_PROGRESS), scheduler con RUN_MAIN guard + daemon + loop try/except. Minor: import Ticket sin usar en checker.py (del brief) -> barrido final.
+Task 7: complete (commits 5e1812d3..039ae234, review approved; 1/1). Implementer murió sin commitear -> controller verificó (1/1) y commiteó. Calendario memoizado por request (DRF comparte el context en listas). Minor: except:pass sin logging en get_serializer_context -> considerar logger.warning en barrido final.
+Task 8: complete (commits ab9189c5..c7adac7f, review approved; 4/4 + suite 28/28). FINDING Important plan-mandated para fix wave final: IsAdminRole duplicado byte-a-byte de landing_cms.permissions (ya 3 copias admin-role en el codebase) -> hoistear a un módulo común. Minor: PATCH policies puede dar 500 en rename de prioridad (edge case, la UI no renombra).
+Task 9: complete (commits 69579d00..b2d709bf, build limpio, review approved; columnas Admin 9/9/9 consistentes, CSS vars OK, null-safe). Minors cosméticos (props sin usar, labelFor edge con due pasado).
+Task 10: complete (commits bb2a08b0..05e76492, build limpio, review approved; api client mapea Task 8, ruta admin-sla con role guard, load/save consistente). Minors pre-existentes/plan-driven: sin manejo de error en save/delete, sin confirm en delete holiday, work_days sin hint de formato.
+
+## Estado: 10/10 tasks completas.
+
+Review final de rama (opus): NEEDS FIXES (soft) -> 1 merge-blocker Important arreglado.
+- Fix (commit 0f3fe4e3): N+1 en `sla` -> `select_related("sla")` en get_queryset base + pool; + guard `if action != "create"` y `logger.warning` en get_serializer_context. Test nuevo assertNumQueries(3) en SerializerSlaTests (confirmado 2/2 post-fix por el fixer). select_related es neutral en comportamiento.
+- Sin import cycle (sla<-tickets_t sólo lazy), idempotencia sólida, degradación elegante, migration graph limpio. Los 8 findings diferidos triageados como follow-up aceptable (DST latente, IsAdminRole dup, imports sin usar, except sin log, test-hygiene, AdminSla UX, cobertura, PATCH 500 edge).
+- Gate pre-merge: suite backend COMPLETA (pre-fix) -> 111/111 OK (2749s; 81 previos + 30 SLA), cero regresiones.
+- Post-fix sla+tickets_t con --keepdb dio 3 fails + 9 errors PERO es artefacto de --keepdb: los TransactionTestCase de la corrida completa previa truncaron la SlaPolicy sembrada por migración, y --keepdb no re-siembra -> todos los fails son seed-dependent ("sin SlaPolicy"). NO es regresión del fix (select_related es neutral). Suite COMPLETA con --noinput (DB fresca re-siembra) -> **112/112 OK** (1243s; 111 + test N+1). GATE DE MERGE EN VERDE. Rama merge-ready.
+- ELEVAR finding #5 (test-hygiene): el seed por migración es frágil ante TransactionTestCase+--keepdb. Fix: crear las SlaPolicy en setUp de los tests seed-dependent (no depender del seed de migración).
+
+FINDINGS diferidos acumulados (para triaje del review final):
+1. [Important latente] DST wall-clock en calendar_engine (_start_of/_end_of) -> ±1h en día de transición si TZ observa DST. Default Mexico_City NO observa DST -> safe hoy. Fix: validar TZ no-DST o math DST-aware.
+2. [Important plan-mandated] IsAdminRole duplicado (sla.admin_views vs landing_cms.permissions; +helper en tickets_t) -> hoistear a módulo común.
+3. [Minor] imports sin usar: settings en sla/models.py, Ticket en sla/checker.py.
+4. [Minor] except:pass sin logging en TicketViewSet.get_serializer_context.
+5. [Minor test-hygiene] TransactionTestCase de notifications trunca SlaPolicy -> warning "sin SlaPolicy". Sembrar policy o bajar log level.
+6. [Minor] AdminSla.vue: sin manejo de error en save/delete, sin confirm en delete, work_days sin hint.
+7. [Minor] compute_levels sin test de branch None / reloj res (heredado del brief).
+8. [Minor] PATCH policies puede dar 500 en rename de prioridad (edge, UI no renombra).
+

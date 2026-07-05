@@ -37,6 +37,7 @@ urlpatterns = [
     path("api/public/", include("landing_cms.public_urls")),
     path("api/admin/landing/", include("landing_cms.admin_urls")),
     path("api/admin/site-settings/", v_settings_admin),
+    path("api/admin/sla/", include("sla.admin_urls")),
     path("api/", include("tickets_t.urls")),
     path("api/", include("notifications.urls")),
     path("api/auth/login-cookie/", LoginCookieView.as_view(), name="login_cookie"),
