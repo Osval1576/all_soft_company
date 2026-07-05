@@ -3,7 +3,8 @@ from zoneinfo import ZoneInfo
 
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from tickets_t.models import Ticket
+from django.utils import timezone
+from tickets_t.models import Ticket, TicketMessage, TicketEvent
 from sla.models import SlaConfig, SlaPolicy, Holiday, TicketSla
 from sla.calendar_engine import Calendar, add_business_time, business_minutes_between
 from sla.levels import compute_levels
@@ -49,7 +50,11 @@ class ModelTests(TestCase):
             reference="ALS-20260101-000500", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="OPEN", creado_por=cu,
         )
+        # El signal de creacion (Task 4) ya crea un TicketSla automaticamente;
+        # se limpia para probar el modelo/relacion OneToOne en aislamiento.
+        TicketSla.objects.filter(ticket=t).delete()
         ts = TicketSla.objects.create(ticket=t, first_response_budget_min=120, resolution_budget_min=960)
+        t.refresh_from_db()
         self.assertEqual(t.sla, ts)
         self.assertEqual(ts.fr_level, "ok")
 
@@ -142,3 +147,63 @@ class LevelTests(TestCase):
         now = _mx(2026, 1, 5, 10, 10)
         s = self._sla(first_response_due_at=_mx(2026, 1, 5, 12, 0))
         self.assertEqual(compute_levels(s, now, _cal())["fr"], "ok")
+
+
+class SignalTests(TestCase):
+    def setUp(self):
+        self.agent = User.objects.create_user(username="sg_ag", password="x", role="AGENT")
+        self.customer = User.objects.create_user(username="sg_cu", password="x", role="CUSTOMER")
+
+    def _ticket(self, prioridad="MEDIUM"):
+        return Ticket.objects.create(
+            reference=f"ALS-20260101-0006{prioridad[:2]}", titulo="T", descripcion="d",
+            prioridad=prioridad, estado="OPEN",
+            creado_por=self.customer, asignado_a=self.agent,
+        )
+
+    def test_ticket_creation_creates_sla_with_budgets(self):
+        t = self._ticket("MEDIUM")
+        ts = TicketSla.objects.get(ticket=t)
+        self.assertEqual(ts.first_response_budget_min, 120)
+        self.assertEqual(ts.resolution_budget_min, 960)
+        self.assertIsNotNone(ts.first_response_due_at)
+        self.assertIsNotNone(ts.resolution_due_at)
+
+    def test_agent_message_marks_first_response(self):
+        t = self._ticket()
+        TicketMessage.objects.create(ticket=t, sender=self.agent, content="hola")
+        t.sla.refresh_from_db()
+        self.assertIsNotNone(t.sla.first_response_met_at)
+        self.assertEqual(t.sla.fr_level, "met")
+
+    def test_customer_message_does_not_mark_first_response(self):
+        t = self._ticket()
+        TicketMessage.objects.create(ticket=t, sender=self.customer, content="hola")
+        t.sla.refresh_from_db()
+        self.assertIsNone(t.sla.first_response_met_at)
+
+    def test_first_response_is_idempotent(self):
+        t = self._ticket()
+        TicketMessage.objects.create(ticket=t, sender=self.agent, content="uno")
+        first = TicketSla.objects.get(ticket=t).first_response_met_at
+        TicketMessage.objects.create(ticket=t, sender=self.agent, content="dos")
+        self.assertEqual(TicketSla.objects.get(ticket=t).first_response_met_at, first)
+
+    def test_status_resolved_event_sets_resolved_at(self):
+        t = self._ticket()
+        TicketEvent.objects.create(ticket=t, kind="status_changed", actor=self.agent,
+                                   payload={"from": "OPEN", "to": "RESOLVED"})
+        t.sla.refresh_from_db()
+        self.assertIsNotNone(t.sla.resolved_at)
+        self.assertEqual(t.sla.res_level, "met")
+
+    def test_priority_change_recomputes_unmet_deadlines(self):
+        t = self._ticket("MEDIUM")
+        old_due = TicketSla.objects.get(ticket=t).resolution_due_at
+        t.prioridad = "URGENT"
+        t.save(update_fields=["prioridad"])
+        TicketEvent.objects.create(ticket=t, kind="priority_changed", actor=self.agent,
+                                   payload={"from": "MEDIUM", "to": "URGENT"})
+        ts = TicketSla.objects.get(ticket=t)
+        self.assertEqual(ts.resolution_budget_min, 240)  # URGENT
+        self.assertNotEqual(ts.resolution_due_at, old_due)

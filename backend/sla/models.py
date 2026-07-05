@@ -4,7 +4,12 @@ from django.conf import settings
 
 class SingletonManager(models.Manager):
     def get_solo(self):
-        obj, _ = self.get_or_create(pk=1)
+        obj, created = self.get_or_create(pk=1)
+        if created:
+            # Tras el create, releer de la DB: los defaults "crudos" (p.ej. TimeField
+            # default="09:00") quedan como str en la instancia en memoria en vez de
+            # castearse a datetime.time, lo que rompe Calendar._start_of/_end_of.
+            obj.refresh_from_db()
         return obj
 
 
