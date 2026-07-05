@@ -43,7 +43,7 @@ class TicketViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         r = _role(user)
-        qs = Ticket.objects.all().order_by("-created_at")
+        qs = Ticket.objects.select_related("sla").all().order_by("-created_at")
         if r == "ADMIN" or user.is_superuser:
             return qs
         if r == "AGENT":
@@ -57,11 +57,12 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
-        try:
-            from sla.calendar_engine import get_calendar
-            ctx["sla_calendar"] = get_calendar()
-        except Exception:
-            pass
+        if self.action != "create":
+            try:
+                from sla.calendar_engine import get_calendar
+                ctx["sla_calendar"] = get_calendar()
+            except Exception:
+                logger.warning("no se pudo cargar el calendario SLA", exc_info=True)
         return ctx
 
     # ---- event emission helpers ----
@@ -114,7 +115,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         user = request.user
         if not (_is_admin(user) or _is_agent(user)):
             return Response({"detail": "Solo técnicos o admin."}, status=403)
-        qs = Ticket.objects.filter(
+        qs = Ticket.objects.select_related("sla").filter(
             asignado_a__isnull=True,
             estado__in=["OPEN", "IN_PROGRESS"],
         ).order_by("-created_at")

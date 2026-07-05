@@ -272,6 +272,22 @@ class SerializerSlaTests(TestCase):
         self.assertIn("level", sla["first_response"])
         self.assertIn(sla["first_response"]["level"], ["ok", "at_risk", "breached", "met"])
 
+    def test_ticket_list_avoids_n_plus_one_on_sla(self):
+        # Segundo ticket del mismo customer: si `sla` no se precarga con
+        # select_related, cada ticket listado dispara un SELECT extra a
+        # sla_ticketsla (N+1). El numero de queries debe mantenerse fijo
+        # sin importar cuantos tickets haya en la lista.
+        Ticket.objects.create(
+            reference="ALS-20260101-000901", titulo="T2", descripcion="d",
+            prioridad="MEDIUM", estado="OPEN", creado_por=self.customer,
+        )
+        c = APIClient()
+        c.force_authenticate(user=self.customer)
+        with self.assertNumQueries(3):
+            r = c.get("/api/tickets_t/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.json()), 2)
+
 
 class AdminApiTests(TestCase):
     def setUp(self):
