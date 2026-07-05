@@ -14,6 +14,7 @@
         <router-link to="/admin/sitio/contenido" class="cms-link">Contenido del sitio</router-link>
         <router-link to="/admin/sitio/equipo" class="cms-link">Equipo</router-link>
         <router-link to="/admin/sitio/ubicaciones" class="cms-link">Ubicaciones</router-link>
+        <router-link to="/admin/sla" class="cms-link">SLA</router-link>
       </section>
 
       <div class="tabs">
