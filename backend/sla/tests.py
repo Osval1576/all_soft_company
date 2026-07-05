@@ -271,3 +271,41 @@ class SerializerSlaTests(TestCase):
         self.assertIn("first_response", sla)
         self.assertIn("level", sla["first_response"])
         self.assertIn(sla["first_response"]["level"], ["ok", "at_risk", "breached", "met"])
+
+
+class AdminApiTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username="aa_adm", password="x", role="ADMIN")
+        self.customer = User.objects.create_user(username="aa_cu", password="x", role="CUSTOMER")
+
+    def _c(self, u):
+        c = APIClient(); c.force_authenticate(user=u); return c
+
+    def test_config_requires_admin(self):
+        self.assertEqual(self._c(self.customer).get("/api/admin/sla/config/").status_code, 403)
+
+    def test_get_and_patch_config(self):
+        c = self._c(self.admin)
+        self.assertEqual(c.get("/api/admin/sla/config/").status_code, 200)
+        r = c.patch("/api/admin/sla/config/", {"at_risk_threshold_pct": 40}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["at_risk_threshold_pct"], 40)
+
+    def test_list_and_patch_policies(self):
+        c = self._c(self.admin)
+        r = c.get("/api/admin/sla/policies/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.json()), 4)
+        r2 = c.patch("/api/admin/sla/policies/",
+                     [{"priority": "URGENT", "first_response_minutes": 15, "resolution_minutes": 120}],
+                     format="json")
+        self.assertEqual(r2.status_code, 200)
+        self.assertEqual(SlaPolicy.objects.get(priority="URGENT").first_response_minutes, 15)
+
+    def test_holidays_crud(self):
+        c = self._c(self.admin)
+        r = c.post("/api/admin/sla/holidays/", {"date": "2026-12-25", "name": "Navidad"}, format="json")
+        self.assertEqual(r.status_code, 201)
+        hid = r.json()["id"]
+        self.assertEqual(c.get("/api/admin/sla/holidays/").status_code, 200)
+        self.assertEqual(c.delete(f"/api/admin/sla/holidays/{hid}/").status_code, 204)
