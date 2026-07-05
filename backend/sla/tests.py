@@ -249,3 +249,25 @@ class CheckerTests(TestCase):
         t.save(update_fields=["estado"])
         run_sla_check()
         self.assertEqual(Notification.objects.filter(kind="sla_breached").count(), 0)
+
+
+from rest_framework.test import APIClient
+
+
+class SerializerSlaTests(TestCase):
+    def setUp(self):
+        self.customer = User.objects.create_user(username="ss_cu", password="x", role="CUSTOMER")
+        self.ticket = Ticket.objects.create(
+            reference="ALS-20260101-000900", titulo="T", descripcion="d",
+            prioridad="MEDIUM", estado="OPEN", creado_por=self.customer,
+        )
+
+    def test_ticket_payload_includes_sla(self):
+        c = APIClient()
+        c.force_authenticate(user=self.customer)
+        r = c.get(f"/api/tickets_t/{self.ticket.id}/")
+        self.assertEqual(r.status_code, 200)
+        sla = r.json()["sla"]
+        self.assertIn("first_response", sla)
+        self.assertIn("level", sla["first_response"])
+        self.assertIn(sla["first_response"]["level"], ["ok", "at_risk", "breached", "met"])

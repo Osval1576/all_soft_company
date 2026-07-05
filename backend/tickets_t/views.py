@@ -55,6 +55,15 @@ class TicketViewSet(viewsets.ModelViewSet):
             return TicketCreateSerializer
         return TicketSerializer
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        try:
+            from sla.calendar_engine import get_calendar
+            ctx["sla_calendar"] = get_calendar()
+        except Exception:
+            pass
+        return ctx
+
     # ---- event emission helpers ----
     def _emit(self, ticket, kind, actor, payload=None):
         TicketEvent.objects.create(ticket=ticket, kind=kind, actor=actor, payload=payload or {})

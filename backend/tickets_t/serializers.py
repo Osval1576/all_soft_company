@@ -20,6 +20,8 @@ class TicketSerializer(serializers.ModelSerializer):
         "CLOSED": {"CLOSED"},
     }
 
+    sla = serializers.SerializerMethodField()
+
     class Meta:
         model = Ticket
         fields = [
@@ -33,8 +35,28 @@ class TicketSerializer(serializers.ModelSerializer):
             "asignado_a",
             "created_at",
             "updated_at",
+            "sla",
         ]
         read_only_fields = ["id", "reference", "creado_por", "created_at", "updated_at"]
+
+    def get_sla(self, obj):
+        ts = getattr(obj, "sla", None)
+        if ts is None:
+            return None
+        from sla.calendar_engine import get_calendar
+        from sla.levels import compute_levels
+        from django.utils import timezone
+        ctx = self.context
+        cal = ctx.get("sla_calendar")
+        if cal is None:
+            cal = get_calendar()
+            if isinstance(ctx, dict):
+                ctx["sla_calendar"] = cal  # memoiza dentro del request (evita N queries)
+        levels = compute_levels(ts, timezone.now(), cal)
+        return {
+            "first_response": {"level": levels["fr"], "due_at": ts.first_response_due_at},
+            "resolution": {"level": levels["res"], "due_at": ts.resolution_due_at},
+        }
 
     def validate_asignado_a(self, value):
         if value is None:
