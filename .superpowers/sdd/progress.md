@@ -142,5 +142,6 @@ F se descompone en F1(SLA)/F2(CSAT)/F3(métricas); este ciclo es F1.
 
 ## Completed tasks
 
-Task 1: complete (commits 6cd71bd8..2b2cb350, review approved; 3/3). Implementer murió sin commitear -> controller verificó (ModelTests 3/3) y commiteó. signals.py es stub intencional (Task 4 lo llena). Minor: import `settings` sin usar en models.py (heredado del plan) -> barrido final.
+Task 1: complete (commits 6cd71bd8..2b2cb350, review approved; 3/3). Implementer murió sin commitear -> controller verificó (ModelTests 3/3) y commiteó. signals.py es stub intencional (Task 4 lo llena). El implementer revivió después, re-implementó de cero y confirmó byte-idéntico (sin dup). Minor: import `settings` sin usar en models.py (heredado del plan) -> barrido final.
+Task 2: complete (commits d9fc5e94..81fc3ebb, review approved; 8/8 calendario + suite 11/11, sin editar tests). FINDING Important LATENTE para review final: _start_of/_end_of usan aritmética wall-clock -> en TZ con DST, día de transición (23/25h) da ±1h de error. NO bloquea (default Mexico_City no observa DST desde 2022). Fix futuro: validar TZ no-DST o math DST-aware. Minors: minutes=0/negativos sin test/guarda.
 
