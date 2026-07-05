@@ -1,13 +1,15 @@
 from datetime import datetime, time, date
 from zoneinfo import ZoneInfo
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from tickets_t.models import Ticket, TicketMessage, TicketEvent
 from sla.models import SlaConfig, SlaPolicy, Holiday, TicketSla
 from sla.calendar_engine import Calendar, add_business_time, business_minutes_between
 from sla.levels import compute_levels
+from sla.checker import run_sla_check
+from notifications.models import Notification
 
 User = get_user_model()
 
@@ -207,3 +209,43 @@ class SignalTests(TestCase):
         ts = TicketSla.objects.get(ticket=t)
         self.assertEqual(ts.resolution_budget_min, 240)  # URGENT
         self.assertNotEqual(ts.resolution_due_at, old_due)
+
+
+@override_settings(NOTIFICATIONS_EMAIL_ASYNC=False)
+class CheckerTests(TestCase):
+    def setUp(self):
+        self.agent = User.objects.create_user(username="ck_ag", password="x", role="AGENT")
+        self.admin = User.objects.create_user(username="ck_adm", password="x", role="ADMIN")
+        self.customer = User.objects.create_user(username="ck_cu", password="x", role="CUSTOMER")
+
+    def _ticket_with_breached_res(self):
+        t = Ticket.objects.create(
+            reference="ALS-20260101-000800", titulo="T", descripcion="d",
+            prioridad="HIGH", estado="OPEN", creado_por=self.customer, asignado_a=self.agent,
+        )
+        ts = t.sla
+        # forzar reloj de resolución vencido y 1a respuesta ya cumplida
+        ts.first_response_met_at = timezone.now()
+        ts.fr_level = "met"
+        ts.resolution_due_at = timezone.now() - timezone.timedelta(hours=1)
+        ts.res_level = "ok"
+        ts.save()
+        return t
+
+    def test_check_notifies_on_breach_and_is_idempotent(self):
+        t = self._ticket_with_breached_res()
+        run_sla_check()
+        n1 = Notification.objects.filter(kind="sla_breached").count()
+        self.assertGreaterEqual(n1, 1)  # agent + admin(s)
+        t.sla.refresh_from_db()
+        self.assertEqual(t.sla.res_level, "breached")
+        # segunda corrida: no re-notifica
+        run_sla_check()
+        self.assertEqual(Notification.objects.filter(kind="sla_breached").count(), n1)
+
+    def test_check_ignores_resolved_tickets(self):
+        t = self._ticket_with_breached_res()
+        t.estado = "RESOLVED"
+        t.save(update_fields=["estado"])
+        run_sla_check()
+        self.assertEqual(Notification.objects.filter(kind="sla_breached").count(), 0)
