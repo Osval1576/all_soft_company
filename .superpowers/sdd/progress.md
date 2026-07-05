@@ -151,4 +151,17 @@ Task 6: complete (commits accb21dc..66eb34ef, review approved; 2/2 + suite 23/23
 Task 7: complete (commits 5e1812d3..039ae234, review approved; 1/1). Implementer murió sin commitear -> controller verificó (1/1) y commiteó. Calendario memoizado por request (DRF comparte el context en listas). Minor: except:pass sin logging en get_serializer_context -> considerar logger.warning en barrido final.
 Task 8: complete (commits ab9189c5..c7adac7f, review approved; 4/4 + suite 28/28). FINDING Important plan-mandated para fix wave final: IsAdminRole duplicado byte-a-byte de landing_cms.permissions (ya 3 copias admin-role en el codebase) -> hoistear a un módulo común. Minor: PATCH policies puede dar 500 en rename de prioridad (edge case, la UI no renombra).
 Task 9: complete (commits 69579d00..b2d709bf, build limpio, review approved; columnas Admin 9/9/9 consistentes, CSS vars OK, null-safe). Minors cosméticos (props sin usar, labelFor edge con due pasado).
+Task 10: complete (commits bb2a08b0..05e76492, build limpio, review approved; api client mapea Task 8, ruta admin-sla con role guard, load/save consistente). Minors pre-existentes/plan-driven: sin manejo de error en save/delete, sin confirm en delete holiday, work_days sin hint de formato.
+
+## Estado: 10/10 tasks completas. Pendiente: review final de rama + finishing.
+
+FINDINGS diferidos acumulados (para triaje del review final):
+1. [Important latente] DST wall-clock en calendar_engine (_start_of/_end_of) -> ±1h en día de transición si TZ observa DST. Default Mexico_City NO observa DST -> safe hoy. Fix: validar TZ no-DST o math DST-aware.
+2. [Important plan-mandated] IsAdminRole duplicado (sla.admin_views vs landing_cms.permissions; +helper en tickets_t) -> hoistear a módulo común.
+3. [Minor] imports sin usar: settings en sla/models.py, Ticket en sla/checker.py.
+4. [Minor] except:pass sin logging en TicketViewSet.get_serializer_context.
+5. [Minor test-hygiene] TransactionTestCase de notifications trunca SlaPolicy -> warning "sin SlaPolicy". Sembrar policy o bajar log level.
+6. [Minor] AdminSla.vue: sin manejo de error en save/delete, sin confirm en delete, work_days sin hint.
+7. [Minor] compute_levels sin test de branch None / reloj res (heredado del brief).
+8. [Minor] PATCH policies puede dar 500 en rename de prioridad (edge, UI no renombra).
 
