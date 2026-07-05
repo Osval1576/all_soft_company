@@ -158,7 +158,9 @@ Task 10: complete (commits bb2a08b0..05e76492, build limpio, review approved; ap
 Review final de rama (opus): NEEDS FIXES (soft) -> 1 merge-blocker Important arreglado.
 - Fix (commit 0f3fe4e3): N+1 en `sla` -> `select_related("sla")` en get_queryset base + pool; + guard `if action != "create"` y `logger.warning` en get_serializer_context. Test nuevo assertNumQueries(3) en SerializerSlaTests (confirmado 2/2 post-fix por el fixer). select_related es neutral en comportamiento.
 - Sin import cycle (sla<-tickets_t sólo lazy), idempotencia sólida, degradación elegante, migration graph limpio. Los 8 findings diferidos triageados como follow-up aceptable (DST latente, IsAdminRole dup, imports sin usar, except sin log, test-hygiene, AdminSla UX, cobertura, PATCH 500 edge).
-- Gate pre-merge: suite backend COMPLETA corriendo (pre-fix, valida tasks 1-10); post-fix se corre tickets_t (app cambiada) como cierre.
+- Gate pre-merge: suite backend COMPLETA (pre-fix) -> 111/111 OK (2749s; 81 previos + 30 SLA), cero regresiones.
+- Post-fix sla+tickets_t con --keepdb dio 3 fails + 9 errors PERO es artefacto de --keepdb: los TransactionTestCase de la corrida completa previa truncaron la SlaPolicy sembrada por migración, y --keepdb no re-siembra -> todos los fails son seed-dependent ("sin SlaPolicy"). NO es regresión del fix (select_related es neutral). Suite COMPLETA con --noinput (DB fresca re-siembra) -> **112/112 OK** (1243s; 111 + test N+1). GATE DE MERGE EN VERDE. Rama merge-ready.
+- ELEVAR finding #5 (test-hygiene): el seed por migración es frágil ante TransactionTestCase+--keepdb. Fix: crear las SlaPolicy en setUp de los tests seed-dependent (no depender del seed de migración).
 
 FINDINGS diferidos acumulados (para triaje del review final):
 1. [Important latente] DST wall-clock en calendar_engine (_start_of/_end_of) -> ±1h en día de transición si TZ observa DST. Default Mexico_City NO observa DST -> safe hoy. Fix: validar TZ no-DST o math DST-aware.
