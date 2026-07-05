@@ -56,11 +56,12 @@
                 <th>Creado por</th>
                 <th>Asignado a</th>
                 <th class="th-sort" @click="tf.toggleSort('created_at')">Fecha <span class="sort-ind">{{ sortInd('created_at') }}</span></th>
+                <th>SLA</th>
                 <th>Asignar agente</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-if="tf.result.length === 0"><td colspan="8" class="empty-cell">Sin resultados.</td></tr>
+              <tr v-if="tf.result.length === 0"><td colspan="9" class="empty-cell">Sin resultados.</td></tr>
               <tr v-for="t in tf.result" :key="t.id">
                 <td><span class="mono">{{ t.reference }}</span></td>
                 <td class="td-title">{{ t.titulo }}</td>
@@ -76,6 +77,7 @@
                 <td>{{ userName(t.creado_por) }}</td>
                 <td>{{ t.asignado_a ? userName(t.asignado_a) : '—' }}</td>
                 <td class="mono">{{ formatDate(t.created_at) }}</td>
+                <td><SlaBadge :sla="t.sla" /></td>
                 <td>
                   <select :value="t.asignado_a ?? ''" @change="patchTicket(t, { asignado_a: $event.target.value || null })" class="inline-select">
                     <option value="">Sin asignar</option>
@@ -155,6 +157,7 @@
 import { computed, onMounted, ref } from "vue";
 import AppTopBar from "../../components/AppTopBar.vue";
 import PriorityDot from "../../components/PriorityDot.vue";
+import SlaBadge from "../../components/tickets/SlaBadge.vue";
 import { listMyTickets, updateTicket, listUsers, createUser, deleteUser } from "../../api/tickets.api";
 import { useTicketFilters } from "../../composables/useTicketFilters.js";
 

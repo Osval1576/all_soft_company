@@ -74,6 +74,7 @@
                   <StatusBadge :status="t.estado" />
                 </div>
                 <div class="ticket-title">{{ t.titulo }}</div>
+                <SlaBadge :sla="t.sla" compact />
               </button>
             </template>
           </aside>
@@ -109,6 +110,7 @@ import ChatPanel from "../../components/ChatPanel.vue";
 import PoolList from "../../components/tickets/PoolList.vue";
 import StatusBadge from "../../components/StatusBadge.vue";
 import PriorityDot from "../../components/PriorityDot.vue";
+import SlaBadge from "../../components/tickets/SlaBadge.vue";
 import { listMyTickets, updateTicket, getPool, takeTicket } from "../../api/tickets.api";
 import { useTicketFilters } from "../../composables/useTicketFilters.js";
 

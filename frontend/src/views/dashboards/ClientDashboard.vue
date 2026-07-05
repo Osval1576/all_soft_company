@@ -31,6 +31,7 @@
               </div>
               <div class="ticket-title">{{ t.titulo }}</div>
               <div class="ticket-date">{{ formatDate(t.created_at) }}</div>
+              <SlaBadge :sla="t.sla" compact />
             </button>
           </template>
         </aside>
@@ -99,6 +100,7 @@ import AppTopBar from "../../components/AppTopBar.vue";
 import ChatPanel from "../../components/ChatPanel.vue";
 import StatusBadge from "../../components/StatusBadge.vue";
 import PriorityDot from "../../components/PriorityDot.vue";
+import SlaBadge from "../../components/tickets/SlaBadge.vue";
 import { listMyTickets, createTicket } from "../../api/tickets.api";
 
 const tickets        = ref([]);
