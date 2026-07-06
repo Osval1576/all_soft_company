@@ -25,6 +25,13 @@
       </div>
     </header>
 
+    <div v-if="canRate" class="csat-banner">
+      <CsatPrompt :ticket-id="ticketId" @submitted="onCsatSubmitted" />
+    </div>
+    <div v-else-if="csat" class="csat-banner">
+      <CsatDisplay :csat="csat" />
+    </div>
+
     <section class="messages" ref="messagesEl">
       <div v-if="loading" class="loading-state">Cargando mensajes...</div>
 
@@ -100,6 +107,8 @@ import { useNotificationsStore } from "../stores/notifications.store";
 import { useWsConnection } from "../composables/useWsConnection";
 import TicketEventTimeline from "./tickets/TicketEventTimeline.vue";
 import MessageAttachment from "./tickets/MessageAttachment.vue";
+import CsatPrompt from "./tickets/CsatPrompt.vue";
+import CsatDisplay from "./tickets/CsatDisplay.vue";
 
 const props = defineProps({
   ticketId:        { type: Number, required: true },
@@ -107,9 +116,11 @@ const props = defineProps({
   showHeader:      { type: Boolean, default: true },
   status:          { type: String, default: null },
   canUpdateStatus: { type: Boolean, default: false },
+  csat:            { type: Object, default: null },
+  canRate:         { type: Boolean, default: false },
 });
 
-defineEmits(["update:status"]);
+const emit = defineEmits(["update:status", "csat-submitted"]);
 
 const auth = useAuthStore();
 const me   = computed(() => auth.user?.username);
@@ -137,6 +148,9 @@ function onFilePicked(e) {
   e.target.value = "";
 }
 function clearPending() { pendingFile.value = null; }
+function onCsatSubmitted(payload) {
+  emit("csat-submitted", payload);
+}
 function prettySize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -402,4 +416,5 @@ onBeforeUnmount(() => notif.setActiveTicket(null));
 .pending-size { color: var(--text-3); font-family: var(--font-mono); font-size: 10px; }
 .pending-remove { color: var(--text-3); font-size: 11px; }
 .pending-remove:hover { color: var(--c-urgent); }
+.csat-banner { flex-shrink: 0; }
 </style>
