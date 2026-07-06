@@ -193,3 +193,6 @@ Task 4: complete (commits 397daafc..ebb88ece, review clean; 4/4 + regresión csa
 Task 5: complete (commits ea0b9315..f0a1f5c8, build limpio, review clean; transcripción exacta). Minors cosméticos: estrellas sin :disabled durante submit; sin focus-visible custom.
 Task 6: complete (commits bd214535..00bd3e41, build limpio, review clean; banner condicional mutuamente exclusivo, layout flex-column verificado sin regresión, ChatPanel sigue pass-through). Minor cosmético: dos divs .csat-banner redundantes (tal como lo especifica el brief).
 Task 7: complete (commits 31573e97..46361909, build limpio, review clean; onStatusChange preservado en Technician, ambos handlers guardan selectedTicket null, list-sync correcto por id). Verificación manual (Step 4) diferida — nota de proceso, no bloquea.
+Task 8: complete (commits de01f451..a6254695, build limpio, review clean). Implementer murió sin commitear -> controller verificó build limpio y commiteó; agente revivió después y confirmó byte-idéntico. Conteo de columnas verificado (10 th/10 td/colspan=10). 8/8 tasks completas.
+
+## Estado: 8/8 tasks completas. Pendiente: review final de rama + finishing.
