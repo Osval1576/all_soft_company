@@ -185,3 +185,5 @@ Spec: docs/superpowers/specs/2026-07-05-csat-f2-design.md
 Pre-flight: sin conflictos, plan escaneado limpio.
 
 ## Completed tasks
+
+Task 1: complete (commits ee0fa757..9b326af6, review clean; 2/2, OneToOne+IntegrityError verificado real). Nits estilísticos triviales (comment default, __str__ usa ticket_id).
