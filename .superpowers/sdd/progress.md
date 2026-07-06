@@ -195,4 +195,11 @@ Task 6: complete (commits bd214535..00bd3e41, build limpio, review clean; banner
 Task 7: complete (commits 31573e97..46361909, build limpio, review clean; onStatusChange preservado en Technician, ambos handlers guardan selectedTicket null, list-sync correcto por id). Verificación manual (Step 4) diferida — nota de proceso, no bloquea.
 Task 8: complete (commits de01f451..a6254695, build limpio, review clean). Implementer murió sin commitear -> controller verificó build limpio y commiteó; agente revivió después y confirmó byte-idéntico. Conteo de columnas verificado (10 th/10 td/colspan=10). 8/8 tasks completas.
 
-## Estado: 8/8 tasks completas. Pendiente: review final de rama + finishing.
+## Estado: 8/8 tasks completas.
+
+Review final de rama (opus): READY. Un finding nuevo Minor pero recomendado como fix ahora (N+1 en csat, mismo patrón que sla en F1) -> aplicando select_related("sla","csat").
+- Orden de checks de seguridad verificado (404->403->400->409->400 score) sin leak de estado a extraños.
+- Decoupling limpio (sin import csat a nivel de módulo en tickets_t), csat_payload como única fuente de verdad (endpoint + serializer llaman la misma función).
+- can_rate seguro (guard sin request/no-auth), frontend sync correcto (selectedTicket + lista), columnas Admin 10/10/10.
+- Los 5 findings conocidos (estrellas sin disabled, sin focus-visible, verificación manual diferida T7/T8, 2 divs banner redundantes, patrón CsatDisplay vs SlaBadge) triageados como follow-up aceptable.
+Suite backend COMPLETA corriendo en background como gate pre-merge.
