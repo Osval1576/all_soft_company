@@ -190,3 +190,4 @@ Task 1: complete (commits ee0fa757..9b326af6, review clean; 2/2, OneToOne+Integr
 Task 2: complete (commits fd1808c6..33d6c461, review clean; 4/4 + suite 6/6). Primer intento murió casi de inmediato (5 tool uses) sin tocar el árbol -> re-despachado limpio sin necesidad de recovery.
 Task 3: complete (commits 494b9b98..b5dbbae9, review clean; 6/6 + suite 12/12). Orden de checks verificado: dueño (403) antes que elegibilidad (400) — el punto de seguridad más delicado, correcto.
 Task 4: complete (commits 397daafc..ebb88ece, review clean; 4/4 + regresión csat+tickets_t 46/46). Backend de CSAT completo T1-T4. can_rate correctamente AND de 3 condiciones, import lazy verificado (sin import csat a nivel de módulo en tickets_t), csat visible cross-role.
+Task 5: complete (commits ea0b9315..f0a1f5c8, build limpio, review clean; transcripción exacta). Minors cosméticos: estrellas sin :disabled durante submit; sin focus-visible custom.
