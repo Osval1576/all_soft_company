@@ -202,4 +202,6 @@ Review final de rama (opus): READY. Un finding nuevo Minor pero recomendado como
 - Decoupling limpio (sin import csat a nivel de módulo en tickets_t), csat_payload como única fuente de verdad (endpoint + serializer llaman la misma función).
 - can_rate seguro (guard sin request/no-auth), frontend sync correcto (selectedTicket + lista), columnas Admin 10/10/10.
 - Los 5 findings conocidos (estrellas sin disabled, sin focus-visible, verificación manual diferida T7/T8, 2 divs banner redundantes, patrón CsatDisplay vs SlaBadge) triageados como follow-up aceptable.
-Suite backend COMPLETA corriendo en background como gate pre-merge.
+Suite backend COMPLETA (pre-fix, 128 tests) -> 1 fail + 2 errors. Diagnosticado: (a) el fail es assertNumQueries(3) de SLA F1, roto porque en el código pre-fix el queryset no tenía select_related("csat") -> N+1 exacto que el fix de csat resuelve; (b) los 2 errors son MySQLdb Lock wait timeout por CONCURRENCIA auto-infligida (corrí la suite completa al mismo tiempo que el fixer corría su propio test contra el mismo DB) -> no son bugs de código.
+Re-run sla+tickets_t con --keepdb: sigue fallando pero por el MISMO artefacto de seed-truncation ya diagnosticado en F1 (SlaConfig singleton borrado por TransactionTestCase previo + --keepdb no re-siembra). CONFIRMADO que el fix es correcto: la query 7 ahora hace un solo LEFT OUTER JOIN con sla_ticketsla Y csat_csatresponse (N+1 resuelto).
+Corriendo sla+tickets_t+csat con --noinput (DB fresca, re-siembra) como gate definitivo.
