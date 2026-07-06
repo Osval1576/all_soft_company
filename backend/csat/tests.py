@@ -64,3 +64,59 @@ class PayloadTests(TestCase):
         self.assertEqual(p["score"], 5)
         self.assertEqual(p["comment"], "Genial")
         self.assertIn("created_at", p)
+
+
+from rest_framework.test import APIClient
+
+
+class SubmitCsatTests(TestCase):
+    def setUp(self):
+        self.customer = User.objects.create_user(username="sub_cu", password="x", role="CUSTOMER")
+        self.stranger = User.objects.create_user(username="sub_x", password="x", role="CUSTOMER")
+        self.agent = User.objects.create_user(username="sub_ag", password="x", role="AGENT")
+        self.ticket = Ticket.objects.create(
+            reference="ALS-20260101-001030", titulo="T", descripcion="d",
+            prioridad="MEDIUM", estado="RESOLVED",
+            creado_por=self.customer, asignado_a=self.agent,
+        )
+
+    def _client(self, user):
+        c = APIClient()
+        c.force_authenticate(user=user)
+        return c
+
+    def _url(self):
+        return f"/api/csat/{self.ticket.id}/"
+
+    def test_submit_creates_response(self):
+        r = self._client(self.customer).post(self._url(), {"score": 5, "comment": "Excelente"}, format="json")
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json()["score"], 5)
+        self.assertEqual(r.json()["comment"], "Excelente")
+        self.assertEqual(CSATResponse.objects.filter(ticket=self.ticket).count(), 1)
+
+    def test_submit_without_comment(self):
+        r = self._client(self.customer).post(self._url(), {"score": 3}, format="json")
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json()["comment"], "")
+
+    def test_submit_forbidden_for_non_owner(self):
+        r = self._client(self.stranger).post(self._url(), {"score": 4}, format="json")
+        self.assertEqual(r.status_code, 403)
+
+    def test_submit_rejected_if_not_eligible(self):
+        self.ticket.estado = "OPEN"
+        self.ticket.save(update_fields=["estado"])
+        r = self._client(self.customer).post(self._url(), {"score": 4}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_submit_rejected_if_already_rated(self):
+        CSATResponse.objects.create(ticket=self.ticket, score=3, comment="")
+        r = self._client(self.customer).post(self._url(), {"score": 5}, format="json")
+        self.assertEqual(r.status_code, 409)
+
+    def test_submit_rejects_invalid_score(self):
+        r = self._client(self.customer).post(self._url(), {"score": 6}, format="json")
+        self.assertEqual(r.status_code, 400)
+        r2 = self._client(self.customer).post(self._url(), {"score": 0}, format="json")
+        self.assertEqual(r2.status_code, 400)
