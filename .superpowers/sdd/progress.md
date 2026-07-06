@@ -187,3 +187,4 @@ Pre-flight: sin conflictos, plan escaneado limpio.
 ## Completed tasks
 
 Task 1: complete (commits ee0fa757..9b326af6, review clean; 2/2, OneToOne+IntegrityError verificado real). Nits estilísticos triviales (comment default, __str__ usa ticket_id).
+Task 2: complete (commits fd1808c6..33d6c461, review clean; 4/4 + suite 6/6). Primer intento murió casi de inmediato (5 tool uses) sin tocar el árbol -> re-despachado limpio sin necesidad de recovery.
