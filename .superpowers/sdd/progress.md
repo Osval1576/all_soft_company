@@ -172,3 +172,36 @@ FINDINGS diferidos acumulados (para triaje del review final):
 7. [Minor] compute_levels sin test de branch None / reloj res (heredado del brief).
 8. [Minor] PATCH policies puede dar 500 en rename de prioridad (edge, UI no renombra).
 
+SLA F1 mergeado a main (merge 8b1c9b4b) y pusheado a origin/main el 2026-07-05.
+
+---
+
+# Sub-proyecto CSAT · F2 (Encuesta de satisfaccion in-app)
+
+Branch: feat/csat-f2 (creada desde main en e15fcf4a el 2026-07-05).
+Plan: docs/superpowers/plans/2026-07-05-csat-f2.md
+Spec: docs/superpowers/specs/2026-07-05-csat-f2-design.md
+
+Pre-flight: sin conflictos, plan escaneado limpio.
+
+## Completed tasks
+
+Task 1: complete (commits ee0fa757..9b326af6, review clean; 2/2, OneToOne+IntegrityError verificado real). Nits estilísticos triviales (comment default, __str__ usa ticket_id).
+Task 2: complete (commits fd1808c6..33d6c461, review clean; 4/4 + suite 6/6). Primer intento murió casi de inmediato (5 tool uses) sin tocar el árbol -> re-despachado limpio sin necesidad de recovery.
+Task 3: complete (commits 494b9b98..b5dbbae9, review clean; 6/6 + suite 12/12). Orden de checks verificado: dueño (403) antes que elegibilidad (400) — el punto de seguridad más delicado, correcto.
+Task 4: complete (commits 397daafc..ebb88ece, review clean; 4/4 + regresión csat+tickets_t 46/46). Backend de CSAT completo T1-T4. can_rate correctamente AND de 3 condiciones, import lazy verificado (sin import csat a nivel de módulo en tickets_t), csat visible cross-role.
+Task 5: complete (commits ea0b9315..f0a1f5c8, build limpio, review clean; transcripción exacta). Minors cosméticos: estrellas sin :disabled durante submit; sin focus-visible custom.
+Task 6: complete (commits bd214535..00bd3e41, build limpio, review clean; banner condicional mutuamente exclusivo, layout flex-column verificado sin regresión, ChatPanel sigue pass-through). Minor cosmético: dos divs .csat-banner redundantes (tal como lo especifica el brief).
+Task 7: complete (commits 31573e97..46361909, build limpio, review clean; onStatusChange preservado en Technician, ambos handlers guardan selectedTicket null, list-sync correcto por id). Verificación manual (Step 4) diferida — nota de proceso, no bloquea.
+Task 8: complete (commits de01f451..a6254695, build limpio, review clean). Implementer murió sin commitear -> controller verificó build limpio y commiteó; agente revivió después y confirmó byte-idéntico. Conteo de columnas verificado (10 th/10 td/colspan=10). 8/8 tasks completas.
+
+## Estado: 8/8 tasks completas.
+
+Review final de rama (opus): READY. Un finding nuevo Minor pero recomendado como fix ahora (N+1 en csat, mismo patrón que sla en F1) -> aplicando select_related("sla","csat").
+- Orden de checks de seguridad verificado (404->403->400->409->400 score) sin leak de estado a extraños.
+- Decoupling limpio (sin import csat a nivel de módulo en tickets_t), csat_payload como única fuente de verdad (endpoint + serializer llaman la misma función).
+- can_rate seguro (guard sin request/no-auth), frontend sync correcto (selectedTicket + lista), columnas Admin 10/10/10.
+- Los 5 findings conocidos (estrellas sin disabled, sin focus-visible, verificación manual diferida T7/T8, 2 divs banner redundantes, patrón CsatDisplay vs SlaBadge) triageados como follow-up aceptable.
+Suite backend COMPLETA (pre-fix, 128 tests) -> 1 fail + 2 errors. Diagnosticado: (a) el fail es assertNumQueries(3) de SLA F1, roto porque en el código pre-fix el queryset no tenía select_related("csat") -> N+1 exacto que el fix de csat resuelve; (b) los 2 errors son MySQLdb Lock wait timeout por CONCURRENCIA auto-infligida (corrí la suite completa al mismo tiempo que el fixer corría su propio test contra el mismo DB) -> no son bugs de código.
+Re-run sla+tickets_t con --keepdb: sigue fallando pero por el MISMO artefacto de seed-truncation ya diagnosticado en F1 (SlaConfig singleton borrado por TransactionTestCase previo + --keepdb no re-siembra). CONFIRMADO que el fix es correcto: la query 7 ahora hace un solo LEFT OUTER JOIN con sla_ticketsla Y csat_csatresponse (N+1 resuelto).
+sla+tickets_t+csat con --noinput (DB fresca) -> **75/75 OK** (1143s). Confirma que el fix del N+1 es correcto y todos los fails previos eran artefactos de --keepdb/concurrencia, no bugs reales. GATE DE MERGE EN VERDE. Rama merge-ready.

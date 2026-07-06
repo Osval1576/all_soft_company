@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "tickets_t",
     "notifications",
     "sla",
+    "csat",
     "channels",
     "landing_cms",
     "django_cleanup.apps.CleanupConfig",

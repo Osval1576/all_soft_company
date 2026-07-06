@@ -43,7 +43,7 @@ class TicketViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         r = _role(user)
-        qs = Ticket.objects.select_related("sla").all().order_by("-created_at")
+        qs = Ticket.objects.select_related("sla", "csat").all().order_by("-created_at")
         if r == "ADMIN" or user.is_superuser:
             return qs
         if r == "AGENT":
@@ -115,7 +115,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         user = request.user
         if not (_is_admin(user) or _is_agent(user)):
             return Response({"detail": "Solo técnicos o admin."}, status=403)
-        qs = Ticket.objects.select_related("sla").filter(
+        qs = Ticket.objects.select_related("sla", "csat").filter(
             asignado_a__isnull=True,
             estado__in=["OPEN", "IN_PROGRESS"],
         ).order_by("-created_at")
