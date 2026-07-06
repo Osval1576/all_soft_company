@@ -45,6 +45,9 @@
             v-else
             :ticket-id="selectedTicket.id"
             :title="`${selectedTicket.reference} — ${selectedTicket.titulo}`"
+            :csat="selectedTicket.csat"
+            :can-rate="selectedTicket.can_rate"
+            @csat-submitted="onCsatSubmitted"
           />
         </main>
       </div>
@@ -164,6 +167,17 @@ async function submitTicket() {
     formError.value = e?.response?.data?.detail || "No se pudo crear el ticket.";
   } finally {
     submitting.value = false;
+  }
+}
+
+function onCsatSubmitted(payload) {
+  if (!selectedTicket.value) return;
+  selectedTicket.value.csat = payload;
+  selectedTicket.value.can_rate = false;
+  const idx = tickets.value.findIndex(t => t.id === selectedTicket.value.id);
+  if (idx !== -1) {
+    tickets.value[idx].csat = payload;
+    tickets.value[idx].can_rate = false;
   }
 }
 

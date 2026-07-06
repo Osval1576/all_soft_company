@@ -90,7 +90,10 @@
             :title="`${selectedTicket.reference} — ${selectedTicket.titulo}`"
             :status="selectedTicket.estado"
             :can-update-status="true"
+            :csat="selectedTicket.csat"
+            :can-rate="selectedTicket.can_rate"
             @update:status="onStatusChange"
+            @csat-submitted="onCsatSubmitted"
           />
         </main>
       </div>
@@ -181,6 +184,17 @@ async function onStatusChange(newStatus) {
     selectedTicket.value = updated;
   } catch (e) {
     alert(e?.response?.data?.estado?.[0] || "No se pudo cambiar el estado.");
+  }
+}
+
+function onCsatSubmitted(payload) {
+  if (!selectedTicket.value) return;
+  selectedTicket.value.csat = payload;
+  selectedTicket.value.can_rate = false;
+  const idx = mine.value.findIndex(t => t.id === selectedTicket.value.id);
+  if (idx !== -1) {
+    mine.value[idx].csat = payload;
+    mine.value[idx].can_rate = false;
   }
 }
 
