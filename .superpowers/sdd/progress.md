@@ -172,3 +172,16 @@ FINDINGS diferidos acumulados (para triaje del review final):
 7. [Minor] compute_levels sin test de branch None / reloj res (heredado del brief).
 8. [Minor] PATCH policies puede dar 500 en rename de prioridad (edge, UI no renombra).
 
+SLA F1 mergeado a main (merge 8b1c9b4b) y pusheado a origin/main el 2026-07-05.
+
+---
+
+# Sub-proyecto CSAT · F2 (Encuesta de satisfaccion in-app)
+
+Branch: feat/csat-f2 (creada desde main en e15fcf4a el 2026-07-05).
+Plan: docs/superpowers/plans/2026-07-05-csat-f2.md
+Spec: docs/superpowers/specs/2026-07-05-csat-f2-design.md
+
+Pre-flight: sin conflictos, plan escaneado limpio.
+
+## Completed tasks
