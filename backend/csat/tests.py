@@ -120,3 +120,46 @@ class SubmitCsatTests(TestCase):
         self.assertEqual(r.status_code, 400)
         r2 = self._client(self.customer).post(self._url(), {"score": 0}, format="json")
         self.assertEqual(r2.status_code, 400)
+
+
+class SerializerCsatTests(TestCase):
+    def setUp(self):
+        self.customer = User.objects.create_user(username="sc_cu", password="x", role="CUSTOMER")
+        self.agent = User.objects.create_user(username="sc_ag", password="x", role="AGENT")
+        self.ticket = Ticket.objects.create(
+            reference="ALS-20260101-001040", titulo="T", descripcion="d",
+            prioridad="MEDIUM", estado="RESOLVED",
+            creado_por=self.customer, asignado_a=self.agent,
+        )
+
+    def _client(self, user):
+        c = APIClient()
+        c.force_authenticate(user=user)
+        return c
+
+    def _get(self, user):
+        return self._client(user).get(f"/api/tickets_t/{self.ticket.id}/")
+
+    def test_can_rate_true_for_owner_when_eligible_and_unrated(self):
+        r = self._get(self.customer)
+        self.assertTrue(r.json()["can_rate"])
+        self.assertIsNone(r.json()["csat"])
+
+    def test_can_rate_false_for_non_owner(self):
+        r = self._get(self.agent)
+        self.assertFalse(r.json()["can_rate"])
+
+    def test_can_rate_false_when_not_eligible(self):
+        self.ticket.estado = "OPEN"
+        self.ticket.save(update_fields=["estado"])
+        r = self._get(self.customer)
+        self.assertFalse(r.json()["can_rate"])
+
+    def test_can_rate_false_and_csat_present_after_rating(self):
+        CSATResponse.objects.create(ticket=self.ticket, score=4, comment="bien")
+        r = self._get(self.customer)
+        self.assertFalse(r.json()["can_rate"])
+        self.assertEqual(r.json()["csat"]["score"], 4)
+        # visible tambien para el tecnico asignado
+        r2 = self._get(self.agent)
+        self.assertEqual(r2.json()["csat"]["score"], 4)

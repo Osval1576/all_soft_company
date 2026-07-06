@@ -21,6 +21,8 @@ class TicketSerializer(serializers.ModelSerializer):
     }
 
     sla = serializers.SerializerMethodField()
+    csat = serializers.SerializerMethodField()
+    can_rate = serializers.SerializerMethodField()
 
     class Meta:
         model = Ticket
@@ -36,6 +38,8 @@ class TicketSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "sla",
+            "csat",
+            "can_rate",
         ]
         read_only_fields = ["id", "reference", "creado_por", "created_at", "updated_at"]
 
@@ -57,6 +61,21 @@ class TicketSerializer(serializers.ModelSerializer):
             "first_response": {"level": levels["fr"], "due_at": ts.first_response_due_at},
             "resolution": {"level": levels["res"], "due_at": ts.resolution_due_at},
         }
+
+    def get_csat(self, obj):
+        from csat.payloads import csat_payload
+        return csat_payload(obj)
+
+    def get_can_rate(self, obj):
+        from csat.eligibility import is_eligible
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        if obj.creado_por_id != request.user.id:
+            return False
+        if not is_eligible(obj):
+            return False
+        return getattr(obj, "csat", None) is None
 
     def validate_asignado_a(self, value):
         if value is None:
