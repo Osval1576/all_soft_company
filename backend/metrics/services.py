@@ -1,7 +1,7 @@
 # backend/metrics/services.py
 from datetime import timedelta
 
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, F, Q
 from django.utils import timezone
 
 
@@ -38,3 +38,18 @@ def csat_summary(qs):
                   .annotate(n=Count("csat__score"))):
         distribution[row["csat__score"]] = row["n"]
     return {"average": agg["average"], "count": agg["count"], "distribution": distribution}
+
+
+def compliance(qs):
+    fr_done = Q(sla__first_response_met_at__isnull=False, sla__first_response_due_at__isnull=False)
+    res_done = Q(sla__resolved_at__isnull=False, sla__resolution_due_at__isnull=False)
+    agg = qs.aggregate(
+        fr_total=Count("id", filter=fr_done),
+        fr_ok=Count("id", filter=fr_done & Q(sla__first_response_met_at__lte=F("sla__first_response_due_at"))),
+        res_total=Count("id", filter=res_done),
+        res_ok=Count("id", filter=res_done & Q(sla__resolved_at__lte=F("sla__resolution_due_at"))),
+    )
+    return {
+        "first_response": (agg["fr_ok"] / agg["fr_total"]) if agg["fr_total"] else None,
+        "resolution": (agg["res_ok"] / agg["res_total"]) if agg["res_total"] else None,
+    }

@@ -78,3 +78,36 @@ class VolumeAndCsatTests(MetricsFactoryMixin, TestCase):
         self.make_ticket(created=timezone.now() - timedelta(days=3))
         self.assertEqual(services.volume_totals(services.windowed_tickets(7))["total"], 1)
         self.assertEqual(services.volume_totals(services.windowed_tickets(90))["total"], 2)
+
+
+class ComplianceTests(MetricsFactoryMixin, TestCase):
+    def _set_sla(self, t, *, fr_met=None, fr_due=None, res_at=None, res_due=None):
+        ts = t.sla
+        ts.first_response_met_at = fr_met
+        ts.first_response_due_at = fr_due
+        ts.resolved_at = res_at
+        ts.resolution_due_at = res_due
+        ts.save()
+
+    def test_resolution_compliance_on_time_vs_late(self):
+        base = timezone.now()
+        t_ok = self.make_ticket(estado="RESOLVED")
+        self._set_sla(t_ok, res_at=base, res_due=base + timedelta(hours=1))      # a tiempo
+        t_late = self.make_ticket(estado="RESOLVED")
+        self._set_sla(t_late, res_at=base + timedelta(hours=2), res_due=base + timedelta(hours=1))  # tarde
+        t_open = self.make_ticket(estado="OPEN")  # sin resolved_at → no cuenta
+        out = services.compliance(services.windowed_tickets(30))
+        self.assertAlmostEqual(out["resolution"], 0.5)  # 1 de 2 con desenlace
+
+    def test_first_response_compliance(self):
+        base = timezone.now()
+        t = self.make_ticket()
+        self._set_sla(t, fr_met=base, fr_due=base + timedelta(minutes=30))
+        out = services.compliance(services.windowed_tickets(30))
+        self.assertEqual(out["first_response"], 1.0)
+
+    def test_compliance_none_when_no_outcome(self):
+        self.make_ticket(estado="OPEN")
+        out = services.compliance(services.windowed_tickets(30))
+        self.assertIsNone(out["resolution"])
+        self.assertIsNone(out["first_response"])
