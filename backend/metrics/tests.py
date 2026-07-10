@@ -1,0 +1,80 @@
+# backend/metrics/tests.py
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.utils import timezone
+
+from tickets_t.models import Ticket
+from csat.models import CSATResponse
+from sla.models import SlaConfig, SlaPolicy
+from metrics import services
+
+MX = ZoneInfo("America/Mexico_City")
+User = get_user_model()
+
+
+def _seed_sla():
+    SlaConfig.objects.get_solo()
+    for prio, fr, res in [("URGENT", 30, 240), ("HIGH", 60, 480),
+                          ("MEDIUM", 120, 960), ("LOW", 240, 1920)]:
+        SlaPolicy.objects.get_or_create(
+            priority=prio,
+            defaults={"first_response_minutes": fr, "resolution_minutes": res},
+        )
+
+
+class MetricsFactoryMixin:
+    _n = 0
+
+    def setUp(self):
+        _seed_sla()
+        self.customer = User.objects.create_user("cust", role="CUSTOMER")
+        self.tech = User.objects.create_user("tech", role="AGENT")
+
+    def make_ticket(self, *, estado="OPEN", created=None, asignado=None, prioridad="MEDIUM"):
+        MetricsFactoryMixin._n += 1
+        return Ticket.objects.create(
+            reference=f"T{MetricsFactoryMixin._n:05d}",
+            titulo="t", descripcion="d", prioridad=prioridad, estado=estado,
+            creado_por=self.customer, asignado_a=asignado,
+            created_at=created or timezone.now(),
+        )
+
+
+class VolumeAndCsatTests(MetricsFactoryMixin, TestCase):
+    def test_volume_totals_counts_by_status(self):
+        self.make_ticket(estado="OPEN")
+        self.make_ticket(estado="IN_PROGRESS")
+        self.make_ticket(estado="RESOLVED")
+        self.make_ticket(estado="CLOSED")
+        qs = services.windowed_tickets(30)
+        self.assertEqual(services.volume_totals(qs),
+                         {"total": 4, "resolved": 2, "open": 2})
+
+    def test_csat_summary_average_and_distribution(self):
+        for score in (5, 4, 4):
+            t = self.make_ticket(estado="RESOLVED")
+            CSATResponse.objects.create(ticket=t, score=score)
+        self.make_ticket(estado="RESOLVED")  # sin CSAT
+        qs = services.windowed_tickets(30)
+        out = services.csat_summary(qs)
+        self.assertEqual(out["count"], 3)
+        # places=3: MySQL's AVG() on an integer column truncates to 4 decimal
+        # places at the SQL level (div_precision_increment), so exact float
+        # equality to 13/3 isn't attainable under this backend.
+        self.assertAlmostEqual(out["average"], 13 / 3, places=3)
+        self.assertEqual(out["distribution"], {1: 0, 2: 0, 3: 0, 4: 2, 5: 1})
+
+    def test_csat_summary_empty_returns_none(self):
+        qs = services.windowed_tickets(30)
+        out = services.csat_summary(qs)
+        self.assertIsNone(out["average"])
+        self.assertEqual(out["count"], 0)
+
+    def test_window_excludes_older_tickets(self):
+        self.make_ticket(created=timezone.now() - timedelta(days=40))
+        self.make_ticket(created=timezone.now() - timedelta(days=3))
+        self.assertEqual(services.volume_totals(services.windowed_tickets(7))["total"], 1)
+        self.assertEqual(services.volume_totals(services.windowed_tickets(90))["total"], 2)
