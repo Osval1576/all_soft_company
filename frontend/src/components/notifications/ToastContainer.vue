@@ -5,6 +5,7 @@
         v-for="t in store.toasts"
         :key="t.toastId"
         class="toast"
+        :class="{ 'toast--error': t.tone === 'error' }"
         @click="onClick(t)"
       >
         <span class="toast-dot" aria-hidden="true"></span>
@@ -22,21 +23,18 @@
 import { useRouter } from "vue-router";
 import { useNotificationsStore } from "../../stores/notifications.store";
 import { useAuthStore } from "../../stores/auth.store";
+import { dashboardRoute } from "../../utils/dashboardRoute.js";
 
 const store = useNotificationsStore();
 const auth = useAuthStore();
 const router = useRouter();
 
-function dashboardRoute() {
-  if (auth.user?.is_superuser) return { name: "admin" };
-  if (auth.user?.is_staff) return { name: "tecnico-inbox" };
-  return { name: "cliente" };
-}
-
 function onClick(t) {
-  store.markRead(t.id);
   store.dismissToast(t.toastId);
-  const target = dashboardRoute();
+  // Los toasts ad-hoc de cliente (errores/avisos) sólo se descartan, no navegan.
+  if (t.client) return;
+  store.markRead(t.id);
+  const target = dashboardRoute(auth.user);
   if (t.ticket) target.query = { ticket: t.ticket };
   router.push(target);
 }
@@ -67,6 +65,8 @@ function onClick(t) {
   color: var(--text);
 }
 .toast:hover { background: var(--surface-2); }
+.toast--error { border-left-color: var(--c-urgent); }
+.toast--error .toast-dot { background: var(--c-urgent); }
 .toast-dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--accent); margin-top: 5px; flex-shrink: 0;
