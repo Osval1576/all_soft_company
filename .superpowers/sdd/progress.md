@@ -205,3 +205,25 @@ Review final de rama (opus): READY. Un finding nuevo Minor pero recomendado como
 Suite backend COMPLETA (pre-fix, 128 tests) -> 1 fail + 2 errors. Diagnosticado: (a) el fail es assertNumQueries(3) de SLA F1, roto porque en el código pre-fix el queryset no tenía select_related("csat") -> N+1 exacto que el fix de csat resuelve; (b) los 2 errors son MySQLdb Lock wait timeout por CONCURRENCIA auto-infligida (corrí la suite completa al mismo tiempo que el fixer corría su propio test contra el mismo DB) -> no son bugs de código.
 Re-run sla+tickets_t con --keepdb: sigue fallando pero por el MISMO artefacto de seed-truncation ya diagnosticado en F1 (SlaConfig singleton borrado por TransactionTestCase previo + --keepdb no re-siembra). CONFIRMADO que el fix es correcto: la query 7 ahora hace un solo LEFT OUTER JOIN con sla_ticketsla Y csat_csatresponse (N+1 resuelto).
 sla+tickets_t+csat con --noinput (DB fresca) -> **75/75 OK** (1143s). Confirma que el fix del N+1 es correcto y todos los fails previos eran artefactos de --keepdb/concurrencia, no bugs reales. GATE DE MERGE EN VERDE. Rama merge-ready.
+
+---
+# F3 · Metricas + Dashboards (rama feat/metrics-f3, iniciada 2026-07-09)
+Plan: docs/superpowers/plans/2026-07-09-metrics-f3.md
+Base de rama: 6cadba44
+Task 1: complete (commits 6cadba44..0fc37e3c, review clean; 4/4). DONE_WITH_CONCERNS: MySQL AVG() trunca a 4 dec -> test relajado a places=3 (legitimo, verificado por reviewer). Minors: imports datetime/MX + self.tech sin usar aun (los usan T3/T5), csat_summary 2 queries (awareness T6).
+Task 2: complete (commits 0fc37e3c..aef69527, review clean; 3/3 + metrics 7/7). Cumplimiento desde timestamps (met_at<=due_at) verificado, denom-0->None, OneToOne descarta fan-out del select_related. Minors plan-mandated: falta test de 1a-respuesta tarde y de null parcial (cobertura, para review final).
+Task 3: complete (commits aef69527..d8116f23 + fix 4a907727, review clean; AvgTimesTests 3/3, metrics 10/10). Important plan-mandated resuelto: agregado test que cruza fin de semana (vie17->lun10 = 120 min laborales, no 3900 wall-clock) -> confirma que avg_times usa el motor de calendario. Minor: DRY de las 2 ramas de values_list (verbatim del brief, no tocar).
+Task 4: complete (commits 4a907727..383c1e0d + fix 5793358c, review clean; TrendTests 2->3, metrics 12/12). Important plan-mandated resuelto: agregado test que setea sla.resolved_at -> cubre la rama de resueltos de trend (resolved-sum=1). Minor plan-mandated: 2 llamadas a timezone.now() (start/end) - non-issue en la practica.
+Task 5: complete (commits 5793358c..0d75a765 + fix f708393b, review clean; RankingTests 1->2, metrics 14/14). Codigo verificado correcto (group-by seguro por OneToOne, sort None-last, denom-None, name sin query extra, loop acotado por #tecnicos). Important resuelto: test que cubre sla_pct None + orden None-al-final + csat_avg None + avg_resolution_min.
+Task 6: complete (commits f708393b..4ac0844a + fix 2e47003c, review clean; EndpointTests 5/5, metrics 19/19). Codigo verificado: gating correcto (Customer 403 ambos, Admin 403 me/, Agent 403 admin/), benchmark sobre team (no self), Calendar unico por request, window default 30, wiring lazy. Important resuelto: test anti-N+1 era tautologia -> reescrito (mide pocos vs muchos tickets mismo tecnico, mismo conteo) -> ahora SI detecta N+1. Minor: benchmark values no asertados en test (codigo correcto). BACKEND F3 COMPLETO.
+Task 7: complete (commit 2e47003c..56320737, review clean; build limpio). Verbatim del brief, api client sigue convencion (http withCredentials), endpoints cross-checkeados contra backend urls, scope puro scaffold. Minor: chunk apexcharts ~509kb (tradeoff aceptado, eleccion del usuario).
+Task 8: complete (commit 56320737..8e2b4955, review clean; build limpio). 6 componentes verbatim, imports resuelven a exports reales de T7, null/empty-states presentes (SlaGauge/CsatBars/TechRankingTable), CsatBars maneja keys 1 y "1" (guard JSON). Minor: TrendLine sin empty-state (chart vacio renderiza ok, verbatim del brief).
+Task 9: complete (commit 8e2b4955..c8ef5006, review clean; build limpio, SIN issues). Vista Admin: props cross-checkeados contra source real de cada componente, ruta gated ADMIN sibling de /admin/sla, nav link agregado, null/loading/error states presentes (retry sin alert), refetch en cambio de ventana.
+Task 10: complete (commit c8ef5006..7a4ad589, review clean; build limpio, SIN issues). Vista Tecnico: benchmark en hints (data.benchmark.*), NO ranking (verificado ausente), ruta gated AGENT, nav .tech-nav agregado, null-guard via fmt helpers, error retry sin alert. Shape cross-checkeado contra MyMetricsView. TODAS LAS 10 TASKS COMPLETAS.
+
+## Estado: 10/10 tasks completas. Minors acumulados para triage del review final:
+- T2: falta test 1a-respuesta tarde + null parcial (cobertura).
+- T4: 2 timezone.now() start/end (non-issue).
+- T6: benchmark values no asertados en test (codigo correcto).
+- T7: bundle apexcharts ~509kb (tradeoff aceptado).
+- T8/T10: TrendLine sin empty-state; apexTheme no re-tematiza en toggle light/dark con vista abierta (follow-up).
