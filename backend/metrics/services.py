@@ -85,3 +85,33 @@ def trend(qs, window):
                        "resolved": resolved_map.get(d, 0)})
         d += timedelta(days=1)
     return series
+
+
+def technician_ranking(qs, cal):
+    assigned = qs.filter(asignado_a__isnull=False)
+    res_done = Q(sla__resolved_at__isnull=False, sla__resolution_due_at__isnull=False)
+    rows = (assigned
+            .values("asignado_a", "asignado_a__first_name",
+                    "asignado_a__last_name", "asignado_a__username")
+            .annotate(
+                resolved=Count("id", filter=Q(estado__in=["RESOLVED", "CLOSED"])),
+                res_total=Count("id", filter=res_done),
+                res_ok=Count("id", filter=res_done & Q(sla__resolved_at__lte=F("sla__resolution_due_at"))),
+                csat_avg=Avg("csat__score"),
+            ))
+    result = []
+    for r in rows:
+        tid = r["asignado_a"]
+        pairs = (assigned.filter(asignado_a_id=tid, sla__resolved_at__isnull=False)
+                 .values_list("created_at", "sla__resolved_at"))
+        name = f"{r['asignado_a__first_name']} {r['asignado_a__last_name']}".strip() or r["asignado_a__username"]
+        result.append({
+            "technician_id": tid,
+            "name": name,
+            "resolved": r["resolved"],
+            "sla_pct": (r["res_ok"] / r["res_total"]) if r["res_total"] else None,
+            "csat_avg": r["csat_avg"],
+            "avg_resolution_min": _avg(pairs, cal),
+        })
+    result.sort(key=lambda x: (x["sla_pct"] is None, -(x["sla_pct"] or 0)))
+    return result

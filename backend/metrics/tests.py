@@ -170,3 +170,26 @@ class TrendTests(MetricsFactoryMixin, TestCase):
         series = services.trend(services.windowed_tickets(7), 7)
         self.assertEqual(sum(r["resolved"] for r in series), 1)
         self.assertEqual(sum(r["created"] for r in series), 1)
+
+
+class RankingTests(MetricsFactoryMixin, TestCase):
+    def test_ranking_groups_by_technician_and_sorts(self):
+        cal = get_calendar()
+        base = timezone.now()
+        tech2 = User.objects.create_user("tech2", role="AGENT", first_name="Ana", last_name="Paz")
+        # tech: 1 resuelto a tiempo (sla_pct=1.0)
+        t1 = self.make_ticket(estado="RESOLVED", asignado=self.tech)
+        ts = t1.sla; ts.resolved_at = base; ts.resolution_due_at = base + timedelta(hours=1); ts.save()
+        CSATResponse.objects.create(ticket=t1, score=5)
+        # tech2: 1 resuelto tarde (sla_pct=0.0)
+        t2 = self.make_ticket(estado="RESOLVED", asignado=tech2)
+        ts2 = t2.sla; ts2.resolved_at = base + timedelta(hours=2); ts2.resolution_due_at = base + timedelta(hours=1); ts2.save()
+        # ticket sin asignar → no aparece
+        self.make_ticket(estado="OPEN", asignado=None)
+        rows = services.technician_ranking(services.windowed_tickets(30), cal)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["technician_id"], self.tech.id)   # sla_pct 1.0 primero
+        self.assertEqual(rows[0]["sla_pct"], 1.0)
+        self.assertEqual(rows[0]["csat_avg"], 5.0)
+        self.assertEqual(rows[1]["sla_pct"], 0.0)
+        self.assertEqual(rows[1]["name"], "Ana Paz")
