@@ -165,6 +165,9 @@ import SlaBadge from "../../components/tickets/SlaBadge.vue";
 import CsatDisplay from "../../components/tickets/CsatDisplay.vue";
 import { listMyTickets, updateTicket, listUsers, createUser, deleteUser } from "../../api/tickets.api";
 import { useTicketFilters } from "../../composables/useTicketFilters.js";
+import { useNotificationsStore } from "../../stores/notifications.store";
+
+const notif = useNotificationsStore();
 
 const TABS = [{ id: "tickets", label: "Tickets" }, { id: "users", label: "Usuarios" }];
 const PRIORITY_LABELS = { LOW: "Baja", MEDIUM: "Media", HIGH: "Alta", URGENT: "Urgente" };
@@ -245,7 +248,7 @@ async function submitUser() {
 async function confirmDelete(u) {
   if (!confirm(`¿Eliminar al usuario "${u.username}"? Esta acción no se puede deshacer.`)) return;
   try { await deleteUser(u.id); users.value = users.value.filter(x => x.id !== u.id); }
-  catch (e) { alert("No se pudo eliminar el usuario."); }
+  catch (e) { notif.pushToast({ title: "No se pudo eliminar el usuario.", tone: "error" }); }
 }
 
 onMounted(loadAll);
