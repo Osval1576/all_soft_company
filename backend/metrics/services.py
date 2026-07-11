@@ -71,8 +71,9 @@ def compliance(qs):
 
 
 def trend(qs, window):
-    start = (timezone.now() - timedelta(days=window)).date()
-    end = timezone.now().date()
+    today = timezone.localdate()
+    start = today - timedelta(days=window)
+    end = today
     created_map = {r["d"]: r["n"] for r in
                    qs.annotate(d=TruncDate("created_at")).values("d").annotate(n=Count("id"))}
     resolved_map = {r["d"]: r["n"] for r in
