@@ -136,3 +136,16 @@ class AvgTimesTests(MetricsFactoryMixin, TestCase):
         out = services.avg_times(services.windowed_tickets(3650), cal)
         self.assertEqual(out["first_response_min"], 60)
         self.assertIsNone(out["resolution_min"])
+
+    def test_resolution_avg_crosses_weekend(self):
+        cal = get_calendar()
+        # Viernes 2026-01-09 17:00 MX -> Lunes 2026-01-12 10:00 MX.
+        # Laboral: vie 17:00-18:00 (60) + lun 09:00-10:00 (60) = 120 min.
+        # Un bug wall-clock daría ~3900 min (65 h), así que este caso lo detecta.
+        created = datetime(2026, 1, 9, 17, 0, tzinfo=MX)
+        t = self.make_ticket(estado="RESOLVED", created=created)
+        ts = t.sla
+        ts.resolved_at = datetime(2026, 1, 12, 10, 0, tzinfo=MX)
+        ts.save()
+        out = services.avg_times(services.windowed_tickets(3650), cal)
+        self.assertEqual(out["resolution_min"], 120)
