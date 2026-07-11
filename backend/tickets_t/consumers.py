@@ -6,6 +6,8 @@ from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
 
 from .models import Ticket, TicketMessage
+from .payloads import message_to_payload
+from .permissions import can_access_ticket
 
 logger = logging.getLogger(__name__)
 
@@ -38,19 +40,14 @@ class TicketChatConsumer(AsyncWebsocketConsumer):
         if not content:
             return
 
-        msg = await self.create_message(user.id, self.ticket_id, content)
+        message = await self.create_message(user.id, self.ticket_id, content)
+        # el path de texto por WS nunca lleva adjunto: se quita la key para
+        # mantener el shape historico del payload byte-identico
+        message.pop("attachment", None)
 
         payload = {
             "type": "chat.message",
-            "message": {
-                "id": msg["id"],
-                "ticket": self.ticket_id,
-                "sender": msg["sender_id"],
-                "sender_username": msg["sender_username"],
-                "sender_role": msg["sender_role"],
-                "content": msg["content"],
-                "created_at": msg["created_at"],
-            },
+            "message": message,
         }
         await self.channel_layer.group_send(self.group_name, payload)
 
@@ -70,14 +67,7 @@ class TicketChatConsumer(AsyncWebsocketConsumer):
         except (Ticket.DoesNotExist, User.DoesNotExist):
             return False
 
-        r = getattr(user, "role", None)
-        if r == "ADMIN" or user.is_superuser:
-            return True
-        if r == "CUSTOMER":
-            return ticket.creado_por_id == user_id
-        if r == "AGENT":
-            return ticket.asignado_a_id == user_id
-        return False
+        return can_access_ticket(user, ticket)
 
     @database_sync_to_async
     def create_message(self, user_id, ticket_id, content):
@@ -96,11 +86,4 @@ class TicketChatConsumer(AsyncWebsocketConsumer):
             dispatch("new_message", ticket, actor=user, extra={"content": content})
         except Exception:
             logger.exception("notification dispatch failed for ticket %s", self.ticket_id)
-        return {
-            "id": m.id,
-            "sender_id": user.id,
-            "sender_username": user.username,
-            "sender_role": getattr(user, "role", None),
-            "content": m.content,
-            "created_at": m.created_at.isoformat(),
-        }
+        return message_to_payload(m)
