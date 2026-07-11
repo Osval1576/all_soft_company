@@ -256,17 +256,19 @@ class EndpointTests(MetricsFactoryMixin, TestCase):
         self.assertEqual(self.client.get("/api/metrics/admin/?window=abc").data["window"], 30)
 
     def test_admin_query_count_independent_of_ticket_count(self):
-        self.client.force_authenticate(self.admin)
-        self.make_ticket(estado="RESOLVED", asignado=self.tech)
-        with self.assertNumQueries(self._count_admin_queries()):
-            self.client.get("/api/metrics/admin/")
-
-    def _count_admin_queries(self):
-        # baseline con 1 técnico + varios tickets; el conteo NO debe crecer con #tickets
-        from django.test.utils import CaptureQueriesContext
         from django.db import connection
-        for _ in range(5):
-            self.make_ticket(estado="RESOLVED", asignado=self.tech)
-        with CaptureQueriesContext(connection) as ctx:
+        from django.test.utils import CaptureQueriesContext
+        self.client.force_authenticate(self.admin)
+        # baseline con pocos tickets asignados a UN técnico fijo
+        self.make_ticket(estado="RESOLVED", asignado=self.tech)
+        with CaptureQueriesContext(connection) as ctx1:
             self.client.get("/api/metrics/admin/")
-        return len(ctx.captured_queries)
+        baseline = len(ctx1.captured_queries)
+        # agregar más tickets al MISMO técnico: el diseño agrega en DB + un loop
+        # acotado por #técnicos (fijo), así que el conteo NO debe crecer con #tickets.
+        # Si crece, es un N+1 real y este assert falla.
+        for _ in range(8):
+            self.make_ticket(estado="RESOLVED", asignado=self.tech)
+        with CaptureQueriesContext(connection) as ctx2:
+            self.client.get("/api/metrics/admin/")
+        self.assertEqual(len(ctx2.captured_queries), baseline)
