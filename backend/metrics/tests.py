@@ -9,6 +9,7 @@ from django.utils import timezone
 from tickets_t.models import Ticket
 from csat.models import CSATResponse
 from sla.models import SlaConfig, SlaPolicy
+from sla.calendar_engine import get_calendar
 from metrics import services
 
 MX = ZoneInfo("America/Mexico_City")
@@ -111,3 +112,27 @@ class ComplianceTests(MetricsFactoryMixin, TestCase):
         out = services.compliance(services.windowed_tickets(30))
         self.assertIsNone(out["resolution"])
         self.assertIsNone(out["first_response"])
+
+
+class AvgTimesTests(MetricsFactoryMixin, TestCase):
+    def test_resolution_avg_business_minutes(self):
+        cal = get_calendar()
+        # Lun 2026-01-05 10:00 MX -> mismo día 12:30 MX = 150 min laborales
+        created = datetime(2026, 1, 5, 10, 0, tzinfo=MX)
+        t = self.make_ticket(estado="RESOLVED", created=created)
+        ts = t.sla
+        ts.resolved_at = datetime(2026, 1, 5, 12, 30, tzinfo=MX)
+        ts.save()
+        out = services.avg_times(services.windowed_tickets(3650), cal)
+        self.assertEqual(out["resolution_min"], 150)
+
+    def test_first_response_avg_and_empty(self):
+        cal = get_calendar()
+        created = datetime(2026, 1, 5, 10, 0, tzinfo=MX)
+        t = self.make_ticket(created=created)
+        ts = t.sla
+        ts.first_response_met_at = datetime(2026, 1, 5, 11, 0, tzinfo=MX)  # 60 min
+        ts.save()
+        out = services.avg_times(services.windowed_tickets(3650), cal)
+        self.assertEqual(out["first_response_min"], 60)
+        self.assertIsNone(out["resolution_min"])

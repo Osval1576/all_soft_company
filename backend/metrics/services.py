@@ -40,6 +40,20 @@ def csat_summary(qs):
     return {"average": agg["average"], "count": agg["count"], "distribution": distribution}
 
 
+def _avg(pairs, cal):
+    from sla.calendar_engine import business_minutes_between
+    mins = [business_minutes_between(a, b, cal) for a, b in pairs]
+    return (sum(mins) / len(mins)) if mins else None
+
+
+def avg_times(qs, cal):
+    fr = qs.filter(sla__first_response_met_at__isnull=False).values_list(
+        "created_at", "sla__first_response_met_at")
+    res = qs.filter(sla__resolved_at__isnull=False).values_list(
+        "created_at", "sla__resolved_at")
+    return {"first_response_min": _avg(fr, cal), "resolution_min": _avg(res, cal)}
+
+
 def compliance(qs):
     fr_done = Q(sla__first_response_met_at__isnull=False, sla__first_response_due_at__isnull=False)
     res_done = Q(sla__resolved_at__isnull=False, sla__resolution_due_at__isnull=False)
