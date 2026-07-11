@@ -41,6 +41,7 @@ urlpatterns = [
     path("api/", include("tickets_t.urls")),
     path("api/", include("notifications.urls")),
     path("api/csat/", include("csat.urls")),
+    path("api/metrics/", include("metrics.urls")),
     path("api/auth/login-cookie/", LoginCookieView.as_view(), name="login_cookie"),
     path("api/auth/refresh-cookie/", RefreshCookieView.as_view(), name="refresh_cookie"),
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),

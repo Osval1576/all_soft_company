@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework.test import APIClient
 
 from tickets_t.models import Ticket
 from csat.models import CSATResponse
@@ -213,3 +214,59 @@ class RankingTests(MetricsFactoryMixin, TestCase):
         self.assertIsNone(rows[-1]["csat_avg"])
         self.assertEqual(rows[0]["sla_pct"], 1.0)
         self.assertIsNotNone(rows[0]["avg_resolution_min"])
+
+
+class EndpointTests(MetricsFactoryMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.admin = User.objects.create_user("admin", role="ADMIN")
+        self.client = APIClient()
+
+    def test_admin_endpoint_requires_admin(self):
+        self.client.force_authenticate(self.tech)
+        self.assertEqual(self.client.get("/api/metrics/admin/").status_code, 403)
+        self.client.force_authenticate(self.customer)
+        self.assertEqual(self.client.get("/api/metrics/admin/").status_code, 403)
+        self.client.force_authenticate(self.admin)
+        r = self.client.get("/api/metrics/admin/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(set(r.data), {"window", "totals", "compliance", "avg_times", "csat", "trend", "ranking"})
+        self.assertEqual(r.data["window"], 30)
+
+    def test_me_endpoint_scopes_to_self_and_has_benchmark(self):
+        tech2 = User.objects.create_user("tech2b", role="AGENT")
+        self.make_ticket(estado="RESOLVED", asignado=self.tech)
+        self.make_ticket(estado="RESOLVED", asignado=tech2)
+        self.client.force_authenticate(self.tech)
+        r = self.client.get("/api/metrics/me/?window=7")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data["window"], 7)
+        self.assertEqual(r.data["totals"]["total"], 1)       # sólo el suyo
+        self.assertIn("benchmark", r.data)
+        self.assertNotIn("ranking", r.data)
+
+    def test_me_endpoint_forbidden_for_admin_and_customer(self):
+        for u in (self.admin, self.customer):
+            self.client.force_authenticate(u)
+            self.assertEqual(self.client.get("/api/metrics/me/").status_code, 403)
+
+    def test_invalid_window_defaults_to_30(self):
+        self.client.force_authenticate(self.admin)
+        self.assertEqual(self.client.get("/api/metrics/admin/?window=999").data["window"], 30)
+        self.assertEqual(self.client.get("/api/metrics/admin/?window=abc").data["window"], 30)
+
+    def test_admin_query_count_independent_of_ticket_count(self):
+        self.client.force_authenticate(self.admin)
+        self.make_ticket(estado="RESOLVED", asignado=self.tech)
+        with self.assertNumQueries(self._count_admin_queries()):
+            self.client.get("/api/metrics/admin/")
+
+    def _count_admin_queries(self):
+        # baseline con 1 técnico + varios tickets; el conteo NO debe crecer con #tickets
+        from django.test.utils import CaptureQueriesContext
+        from django.db import connection
+        for _ in range(5):
+            self.make_ticket(estado="RESOLVED", asignado=self.tech)
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.get("/api/metrics/admin/")
+        return len(ctx.captured_queries)
