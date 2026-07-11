@@ -149,3 +149,15 @@ class AvgTimesTests(MetricsFactoryMixin, TestCase):
         ts.save()
         out = services.avg_times(services.windowed_tickets(3650), cal)
         self.assertEqual(out["resolution_min"], 120)
+
+
+class TrendTests(MetricsFactoryMixin, TestCase):
+    def test_trend_shape_and_zero_fill(self):
+        self.make_ticket(created=timezone.now() - timedelta(days=1))
+        self.make_ticket(created=timezone.now() - timedelta(days=1))
+        series = services.trend(services.windowed_tickets(7), 7)
+        self.assertEqual(len(series), 8)                       # window + 1 días
+        self.assertEqual(sorted(series, key=lambda r: r["date"]), series)  # asc
+        self.assertEqual(sum(r["created"] for r in series), 2)
+        self.assertTrue(any(r["created"] == 0 for r in series))  # hay zero-fill
+        self.assertTrue(all(set(r) == {"date", "created", "resolved"} for r in series))

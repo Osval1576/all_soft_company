@@ -2,6 +2,7 @@
 from datetime import timedelta
 
 from django.db.models import Avg, Count, F, Q
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 
@@ -67,3 +68,20 @@ def compliance(qs):
         "first_response": (agg["fr_ok"] / agg["fr_total"]) if agg["fr_total"] else None,
         "resolution": (agg["res_ok"] / agg["res_total"]) if agg["res_total"] else None,
     }
+
+
+def trend(qs, window):
+    start = (timezone.now() - timedelta(days=window)).date()
+    end = timezone.now().date()
+    created_map = {r["d"]: r["n"] for r in
+                   qs.annotate(d=TruncDate("created_at")).values("d").annotate(n=Count("id"))}
+    resolved_map = {r["d"]: r["n"] for r in
+                    qs.filter(sla__resolved_at__isnull=False)
+                      .annotate(d=TruncDate("sla__resolved_at")).values("d").annotate(n=Count("id"))}
+    series, d = [], start
+    while d <= end:
+        series.append({"date": d.isoformat(),
+                       "created": created_map.get(d, 0),
+                       "resolved": resolved_map.get(d, 0)})
+        d += timedelta(days=1)
+    return series
