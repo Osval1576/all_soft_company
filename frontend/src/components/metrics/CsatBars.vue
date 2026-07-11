@@ -5,20 +5,25 @@
       <span class="card-title">Distribución CSAT</span>
       <span class="avg">{{ average === null ? "—" : average.toFixed(1) }} ★</span>
     </div>
-    <apexchart type="bar" height="200" :options="opts" :series="series" />
+    <apexchart :key="themeKey" type="bar" height="200" :options="opts" :series="series" />
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue";
 import { baseOptions, chartColors } from "../../theme/apexTheme.js";
+import { useTheme } from "../../composables/useTheme.js";
 
 const props = defineProps({ distribution: Object, average: { type: Number, default: null } });
+
+const { isDark } = useTheme();
+const themeKey = computed(() => (isDark.value ? "dark" : "light"));
 
 const series = computed(() => [{ name: "Respuestas",
   data: [1, 2, 3, 4, 5].map((s) => (props.distribution?.[s] ?? props.distribution?.[String(s)] ?? 0)) }]);
 
 const opts = computed(() => {
+  void themeKey.value; // dependencia reactiva: recomputa colores al togglear el tema
   const c = chartColors();
   return {
     ...baseOptions(),

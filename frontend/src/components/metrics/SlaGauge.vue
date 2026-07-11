@@ -2,7 +2,7 @@
 <template>
   <div class="gauge">
     <span class="gauge-label">{{ label }}</span>
-    <apexchart v-if="value !== null" type="radialBar" height="180" :options="opts" :series="[Math.round(value * 100)]" />
+    <apexchart v-if="value !== null" :key="themeKey" type="radialBar" height="180" :options="opts" :series="[Math.round(value * 100)]" />
     <div v-else class="gauge-empty">—</div>
   </div>
 </template>
@@ -10,10 +10,15 @@
 <script setup>
 import { computed } from "vue";
 import { baseOptions, chartColors } from "../../theme/apexTheme.js";
+import { useTheme } from "../../composables/useTheme.js";
 
 const props = defineProps({ label: String, value: { type: Number, default: null } });
 
+const { isDark } = useTheme();
+const themeKey = computed(() => (isDark.value ? "dark" : "light"));
+
 const opts = computed(() => {
+  void themeKey.value; // dependencia reactiva: recomputa colores al togglear el tema
   const c = chartColors();
   const color = props.value >= 0.9 ? c.good : props.value >= 0.75 ? c.warn : c.bad;
   return {
