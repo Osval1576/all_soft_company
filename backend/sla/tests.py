@@ -5,7 +5,7 @@ from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from tickets_t.models import Ticket, TicketMessage, TicketEvent
-from sla.models import SlaConfig, SlaPolicy, Holiday, TicketSla
+from sla.models import SlaConfig, SlaPolicy, TicketSla
 from sla.calendar_engine import Calendar, add_business_time, business_minutes_between
 from sla.levels import compute_levels
 from sla.checker import run_sla_check

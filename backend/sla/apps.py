@@ -1,4 +1,8 @@
+import logging
+
 from django.apps import AppConfig
+
+logger = logging.getLogger(__name__)
 
 
 class SlaAppConfig(AppConfig):
@@ -14,4 +18,4 @@ class SlaAppConfig(AppConfig):
                 from .scheduler import start_scheduler
                 start_scheduler()
             except Exception:
-                pass
+                logger.exception("no se pudo iniciar el scheduler de SLA")

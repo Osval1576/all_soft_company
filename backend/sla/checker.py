@@ -12,7 +12,6 @@ _CLOCK_LABEL = {"fr": "primera respuesta", "res": "resolución"}
 
 
 def run_sla_check():
-    from tickets_t.models import Ticket
     from .models import TicketSla
 
     cal = get_calendar()
