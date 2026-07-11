@@ -14,5 +14,6 @@ def me(request):
             "email": u.email,
             "is_staff": u.is_staff,
             "is_superuser": u.is_superuser,
+            "role": u.role,
         }
     )
