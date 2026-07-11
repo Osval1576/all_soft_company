@@ -2,6 +2,10 @@
   <div class="page">
     <AppTopBar title="Panel del técnico" />
 
+    <div class="tech-nav">
+      <router-link to="/tecnico/metricas" class="tech-nav-link">Mis métricas</router-link>
+    </div>
+
     <div class="content">
       <div class="stats-row">
         <div class="stat-card">
@@ -204,6 +208,10 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.tech-nav { max-width: 1100px; margin: 0 auto; padding: 12px 20px 0; }
+.tech-nav-link { font-family: var(--font-mono); font-size: 12px; color: var(--accent);
+                 border: 0.5px solid var(--border); border-radius: var(--r-sm); padding: 6px 12px; }
+.tech-nav-link:hover { background: var(--accent-light); }
 .page { display: flex; flex-direction: column; height: 100%; }
 .content { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 16px 20px; gap: 16px; overflow: hidden; }
 

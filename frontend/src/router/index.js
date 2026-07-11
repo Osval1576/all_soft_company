@@ -10,6 +10,7 @@ import ClientDashboard from "../views/dashboards/ClientDashboard.vue";
 import TechnicianDashboard from "../views/dashboards/TechnicianDashboard.vue";
 import AdminDashboard from "../views/dashboards/AdminDashboard.vue";
 import TechnicianInboxView from "../views/dashboards/TechnicianInboxView.vue";
+import TechnicianMetrics from "../views/dashboards/TechnicianMetrics.vue";
 
 import AdminContent from "../views/admin/site/AdminContent.vue";
 import AdminTeam from "../views/admin/site/AdminTeam.vue";
@@ -32,6 +33,7 @@ const routes = [
   { path: "/cliente", name: "cliente", component: ClientDashboard, meta: { role: "CUSTOMER" } },
   { path: "/tecnico", name: "tecnico", component: TechnicianDashboard, meta: { role: "AGENT" } },
   { path: "/tecnico/inbox", name: "tecnico-inbox", component: TechnicianInboxView, meta: { role: "AGENT" } },
+  { path: "/tecnico/metricas", name: "tecnico-metricas", component: TechnicianMetrics, meta: { role: "AGENT" } },
   { path: "/admin", name: "admin", component: AdminDashboard, meta: { role: "ADMIN" } },
   { path: "/admin/sla", name: "admin-sla", component: AdminSla, meta: { role: "ADMIN" } },
   { path: "/admin/metricas", name: "admin-metricas", component: AdminMetrics, meta: { role: "ADMIN" } },
