@@ -161,3 +161,12 @@ class TrendTests(MetricsFactoryMixin, TestCase):
         self.assertEqual(sum(r["created"] for r in series), 2)
         self.assertTrue(any(r["created"] == 0 for r in series))  # hay zero-fill
         self.assertTrue(all(set(r) == {"date", "created", "resolved"} for r in series))
+
+    def test_trend_counts_resolved(self):
+        t = self.make_ticket(estado="RESOLVED", created=timezone.now() - timedelta(days=1))
+        ts = t.sla
+        ts.resolved_at = timezone.now() - timedelta(days=1)
+        ts.save()
+        series = services.trend(services.windowed_tickets(7), 7)
+        self.assertEqual(sum(r["resolved"] for r in series), 1)
+        self.assertEqual(sum(r["created"] for r in series), 1)
