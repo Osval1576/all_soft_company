@@ -8,7 +8,8 @@ from .models import (
     HeroContent, AboutContent, SiteSettings,
     Feature, TeamMember, Location,
 )
-from .permissions import IsAdminRole
+from users.permissions import IsAdminRole
+
 from .serializers import (
     HeroSerializer, AboutSerializer, SiteSettingsSerializer,
     FeatureSerializer, TeamMemberSerializer, LocationSerializer,
