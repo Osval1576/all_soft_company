@@ -193,3 +193,23 @@ class RankingTests(MetricsFactoryMixin, TestCase):
         self.assertEqual(rows[0]["csat_avg"], 5.0)
         self.assertEqual(rows[1]["sla_pct"], 0.0)
         self.assertEqual(rows[1]["name"], "Ana Paz")
+
+    def test_ranking_sorts_none_last_and_covers_optional_fields(self):
+        cal = get_calendar()
+        base = timezone.now()
+        # técnico con un resuelto a tiempo -> sla_pct 1.0, con CSAT y tiempo de resolución
+        t1 = self.make_ticket(estado="RESOLVED", asignado=self.tech)
+        ts = t1.sla
+        ts.resolved_at = base
+        ts.resolution_due_at = base + timedelta(hours=1)
+        ts.save()
+        CSATResponse.objects.create(ticket=t1, score=5)
+        # técnico con sólo un ticket OPEN (sin desenlace) -> sla_pct None, csat None
+        tech3 = User.objects.create_user("tech3r", role="AGENT")
+        self.make_ticket(estado="OPEN", asignado=tech3)
+        rows = services.technician_ranking(services.windowed_tickets(30), cal)
+        self.assertEqual(rows[-1]["technician_id"], tech3.id)   # None al final
+        self.assertIsNone(rows[-1]["sla_pct"])
+        self.assertIsNone(rows[-1]["csat_avg"])
+        self.assertEqual(rows[0]["sla_pct"], 1.0)
+        self.assertIsNotNone(rows[0]["avg_resolution_min"])
