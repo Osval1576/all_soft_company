@@ -46,11 +46,7 @@ const ALL_OPTIONS = [
   { field: "email_on_ticket_created", label: "Tickets nuevos", desc: "Cuando entra un ticket nuevo al sistema.", roles: ["ADMIN"] },
 ];
 
-const myRole = computed(() => {
-  if (auth.user?.is_superuser) return "ADMIN";
-  if (auth.user?.is_staff) return "AGENT";
-  return "CUSTOMER";
-});
+const myRole = computed(() => auth.user?.role ?? "CUSTOMER");
 
 const visibleOptions = computed(() =>
   ALL_OPTIONS.filter((o) => o.roles.includes(myRole.value))

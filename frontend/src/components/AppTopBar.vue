@@ -40,8 +40,8 @@ const auth = useAuthStore()
 const { isDark, toggle } = useTheme()
 
 const roleLabel = computed(() => {
-  if (auth.user?.is_superuser) return 'Admin'
-  if (auth.user?.is_staff)     return 'Técnico'
+  if (auth.user?.role === 'ADMIN') return 'Admin'
+  if (auth.user?.role === 'AGENT') return 'Técnico'
   return 'Cliente'
 })
 </script>
