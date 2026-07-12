@@ -7,3 +7,5 @@ djangorestframework_simplejwt==5.5.1
 mysqlclient==2.2.8
 Pillow>=10.0
 django-cleanup>=8.0
+channels-redis==4.3.0
+django-redis==7.0.0
