@@ -68,7 +68,7 @@ sudo chmod 644 ./certs/fullchain.pem ./certs/privkey.pem
 
 ### 3.3 Agregar el bloque 443 a `frontend/nginx.conf`
 
-Agregar este bloque **antes** del `server { listen 80; ... }` existente, y agregar el redirect 80→443 dentro del bloque 80 (dejando `/api/health/` fuera del redirect no es necesario acá porque el healthcheck del compose pega directo a `web:8000`, no pasa por nginx):
+Agregar el bloque 443 de abajo **antes** del bloque `server { listen 80; ... }` existente. El bloque `server { listen 80; server_name _; ... }` original (el que sirve la app directamente por HTTP) debe ser **reemplazado por completo** por el bloque de redirect 80→443 que aparece al final — no debe quedar ningún vhost HTTP sin redirect sirviendo la app en el puerto 80 en paralelo al 443 (dejando `/api/health/` fuera del redirect no es necesario acá porque el healthcheck del compose pega directo a `web:8000`, no pasa por nginx):
 
 ```nginx
 server {
@@ -198,18 +198,33 @@ Abrir dos sesiones de navegador (o una normal + una privada) logueadas con usuar
 
 Volver a una sola réplica después de la prueba (`docker compose up -d --scale web=1`) salvo que se quiera dejar escalado — ver sección 5.
 
-**(d) Matar Redis produce un 5xx ruidoso, no degradación silenciosa:**
+**(d) Matar Redis produce una falla ruidosa, no degradación silenciosa:**
+
+`/api/health/` **no** sirve para esta prueba: solo hace `SELECT 1` contra MySQL y no toca Redis, así que va a seguir devolviendo 200 aunque Redis esté caído. Hay que ejercer un camino que sí dependa de Redis:
 
 ```bash
 docker compose stop redis
-curl -i https://allsafe.example.com/api/health/
+
+# 1. Cache: debe fallar con un error de conexión visible, no degradarse en silencio
+docker compose exec web python manage.py shell -c "
+from django.core.cache import cache
+cache.set('probe', 1)
+"
+# Debe levantar una excepción de conexión a Redis (ej. ConnectionError/RedisError), no
+# completar en silencio ni caer a un fallback en memoria.
+
+# 2. Channel layer / WS: recargar la app en el navegador y abrir un ticket con chat.
+#    El badge de estado de notificaciones/WS debe marcar "desconectado" — no debe
+#    quedar conectado con datos parciales.
 ```
 
-Con Redis caído, `/api/health/` (o cualquier request que dependa de cache/channel layer) debe devolver un error 5xx visible, no un 200 con datos parciales o cacheados de forma inconsistente. Esto confirma que una caída de Redis se nota de inmediato en monitoreo, en vez de degradarse en silencio. Volver a levantar Redis después:
+Con Redis caído, tanto el cache como el channel layer deben fallar de forma ruidosa (excepción/errores visibles), confirmando que una caída de Redis se nota de inmediato en monitoreo, en vez de degradarse en silencio. Volver a levantar Redis y confirmar la recuperación:
 
 ```bash
 docker compose start redis
 ```
+
+Repetir el paso del cache (`cache.set`) y refrescar el navegador: el `cache.set` debe completar sin error y el badge de WS debe volver a "conectado".
 
 ## 5. Escalar `web`
 
@@ -220,6 +235,8 @@ docker compose up -d --scale web=2
 ```
 
 nginx hace proxy a `web:8000` y Docker Compose resuelve ese nombre a todas las réplicas activas (round-robin por DNS interno).
+
+Escalar solo **después** del primer deploy exitoso con `web=1`: las réplicas nuevas vuelven a correr `migrate`/`collectstatic` en el boot pero son no-op sobre un esquema ya migrado; si el arranque en frío se hace directamente con `web=2`, dos réplicas correrían `migrate` en paralelo sobre una base recién creada, lo cual es una condición de carrera evitable.
 
 **`scheduler` SIEMPRE debe quedar en una sola réplica.** `check_sla --loop` no está diseñado para correr en paralelo — dos réplicas del scheduler generarían notificaciones/violaciones de SLA duplicadas. No agregar `--scale scheduler=N` con N>1. Esto es justamente lo que gatea `SLA_SCHEDULER_MODE`: en `web` queda en `"off"` (el scheduler in-process está apagado) porque el servicio `scheduler` dedicado es el único que corre `check_sla --loop`.
 
