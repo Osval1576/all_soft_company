@@ -227,3 +227,5 @@ Task 10: complete (commit c8ef5006..7a4ad589, review clean; build limpio, SIN is
 - T6: benchmark values no asertados en test (codigo correcto).
 - T7: bundle apexcharts ~509kb (tradeoff aceptado).
 - T8/T10: TrendLine sin empty-state; apexTheme no re-tematiza en toggle light/dark con vista abierta (follow-up).
+
+Barrido de follow-ups (rama chore/follow-ups-sweep, 2026-07-11/12): 16 commits (A1-A7 backend + B1-B11 frontend). Review de rama: Approved, 18/18 items, 0 Critical/Important. Gate: suite completa fresca 150/150 OK (147 + 3 tests nuevos del barrido). Verificacion browser: B9 re-theme confirmado en vivo (strokes cambian con data-theme, 4 charts sobreviven el remount); F3 dashboards PASS pre-barrido. Backend implementer murio sin reporte -> controller verifico commits + corrio suite. Nota: HMR de Vite corrompe la sesion del browser si se edita con el dev server vivo -> reiniciar server tras sweeps grandes.
