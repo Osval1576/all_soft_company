@@ -240,3 +240,18 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "AllSafe <no-reply@all
 
 # Envío de emails en thread daemon (no bloquea WS/request). En tests se pone False.
 NOTIFICATIONS_EMAIL_ASYNC = True
+
+# -----------------------
+# Seguridad HTTP (prod)
+# -----------------------
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = _env_bool("SECURE_SSL_REDIRECT", not DEBUG)
+SECURE_REDIRECT_EXEMPT = [r"^api/health/$"]  # healthcheck de compose entra por http directo
+SECURE_HSTS_SECONDS = int(_env("SECURE_HSTS_SECONDS", "0" if DEBUG else "3600"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", False)
+SECURE_REFERRER_POLICY = "same-origin"
+
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+# Cookies JWT (config/auth_views.py)
+AUTH_COOKIE_SECURE = _env_bool("COOKIE_SECURE", not DEBUG)

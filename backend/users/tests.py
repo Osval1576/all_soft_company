@@ -17,3 +17,10 @@ class ProdSettingsCheckTests(TestCase):
     @override_settings(DEBUG=True)
     def test_dev_pasa_sin_errores(self):
         self.assertEqual(prod_settings_check(None), [])
+
+
+class HealthEndpointTests(TestCase):
+    def test_health_sin_auth_devuelve_ok(self):
+        resp = self.client.get("/api/health/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {"ok": True})

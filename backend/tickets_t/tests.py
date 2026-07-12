@@ -364,6 +364,11 @@ class DownloadAttachmentTests(TestCase):
         r = self._client(self.stranger).get(self._url())
         self.assertEqual(r.status_code, 403)
 
+    def test_download_lleva_nosniff(self):
+        r = self._client(self.customer).get(self._url())
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["X-Content-Type-Options"], "nosniff")
+
     def test_download_404_for_missing_message(self):
         r = self._client(self.customer).get(self._url(mid=999999))
         self.assertEqual(r.status_code, 404)

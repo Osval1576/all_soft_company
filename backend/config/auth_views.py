@@ -1,4 +1,5 @@
 from django.conf import settings
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -10,11 +11,11 @@ COOKIE_ACCESS_NAME = "access"
 COOKIE_REFRESH_NAME = "refresh"
 
 def cookie_settings():
-    # En local normalmente NO hay https, entonces secure=False.
-    # En producción: secure=True y probablemente SameSite=None.
+    # secure=True en prod (DEBUG=false), False en dev http. SameSite Lax alcanza
+    # porque en prod el front es same-origin detrás de Nginx.
     return {
         "httponly": True,
-        "secure": False,
+        "secure": settings.AUTH_COOKIE_SECURE,
         "samesite": "Lax",
         "path": "/",
     }
