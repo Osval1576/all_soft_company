@@ -8,6 +8,7 @@
         type="button"
         class="csat-star"
         :class="{ 'csat-star--filled': n <= (hoverScore || score) }"
+        :disabled="submitting"
         @mouseenter="hoverScore = n"
         @mouseleave="hoverScore = 0"
         @click="score = n"
@@ -78,6 +79,12 @@ async function submit() {
   transition: color .1s;
 }
 .csat-star--filled { color: var(--accent); }
+.csat-star:disabled { cursor: not-allowed; opacity: .6; }
+.csat-star:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 .csat-comment {
   padding: 8px 10px;
   border: 0.5px solid var(--border);
@@ -108,4 +115,8 @@ async function submit() {
 }
 .csat-submit:hover:not(:disabled) { background: var(--accent-hover); }
 .csat-submit:disabled { opacity: .4; cursor: not-allowed; }
+.csat-submit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 </style>

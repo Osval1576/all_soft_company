@@ -41,7 +41,11 @@
           <ul class="hol-list">
             <li v-for="h in holidays" :key="h.id">
               <span>{{ h.date }} — {{ h.name || "—" }}</span>
-              <button class="btn-x" @click="removeHoliday(h.id)">✕</button>
+              <button
+                class="btn-x"
+                :class="{ 'btn-x--confirm': confirmingId === h.id }"
+                @click.stop="onRemoveClick(h.id)"
+              >{{ confirmingId === h.id ? "¿Seguro?" : "✕" }}</button>
             </li>
           </ul>
         </section>
@@ -52,39 +56,91 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import AppTopBar from "../../../components/AppTopBar.vue";
+import { useNotificationsStore } from "../../../stores/notifications.store";
 import {
   getSlaConfig, updateSlaConfig, getSlaPolicies, updateSlaPolicies,
   getHolidays, createHoliday, deleteHoliday,
 } from "../../../api/sla.api";
 
 const PRIO = { LOW: "Baja", MEDIUM: "Media", HIGH: "Alta", URGENT: "Urgente" };
+const notif = useNotificationsStore();
 const loading = ref(true);
 const saved = ref(false);
 const config = ref({});
 const policies = ref([]);
 const holidays = ref([]);
 const newHol = ref({ date: "", name: "" });
+const confirmingId = ref(null);
+let confirmTimer = null;
 
 function flash() { saved.value = true; setTimeout(() => (saved.value = false), 1500); }
 
-async function savePolicies() { policies.value = await updateSlaPolicies(policies.value); flash(); }
-async function saveConfig() { config.value = await updateSlaConfig(config.value); flash(); }
+async function savePolicies() {
+  try {
+    policies.value = await updateSlaPolicies(policies.value);
+    flash();
+  } catch (_) {
+    notif.pushToast({ title: "No se pudieron guardar las políticas.", tone: "error" });
+  }
+}
+async function saveConfig() {
+  try {
+    config.value = await updateSlaConfig(config.value);
+    flash();
+  } catch (_) {
+    notif.pushToast({ title: "No se pudo guardar la ventana laboral.", tone: "error" });
+  }
+}
 async function addHoliday() {
   if (!newHol.value.date) return;
-  await createHoliday({ ...newHol.value });
-  holidays.value = await getHolidays();
-  newHol.value = { date: "", name: "" };
+  try {
+    await createHoliday({ ...newHol.value });
+    holidays.value = await getHolidays();
+    newHol.value = { date: "", name: "" };
+  } catch (_) {
+    notif.pushToast({ title: "No se pudo agregar el feriado.", tone: "error" });
+  }
 }
-async function removeHoliday(id) { await deleteHoliday(id); holidays.value = holidays.value.filter(h => h.id !== id); }
+
+function resetConfirm() {
+  clearTimeout(confirmTimer);
+  confirmingId.value = null;
+}
+
+function onRemoveClick(id) {
+  if (confirmingId.value === id) {
+    resetConfirm();
+    removeHoliday(id);
+  } else {
+    clearTimeout(confirmTimer);
+    confirmingId.value = id;
+    confirmTimer = setTimeout(resetConfirm, 3000);
+  }
+}
+
+async function removeHoliday(id) {
+  try {
+    await deleteHoliday(id);
+    holidays.value = holidays.value.filter(h => h.id !== id);
+  } catch (_) {
+    notif.pushToast({ title: "No se pudo eliminar el feriado.", tone: "error" });
+  }
+}
 
 onMounted(async () => {
+  document.addEventListener("click", resetConfirm);
   try {
     [config.value, policies.value, holidays.value] = await Promise.all([
       getSlaConfig(), getSlaPolicies(), getHolidays(),
     ]);
   } finally { loading.value = false; }
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", resetConfirm);
+  clearTimeout(confirmTimer);
 });
 </script>
 
@@ -108,5 +164,6 @@ onMounted(async () => {
 .hol-list li { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 0.5px solid var(--border); font-size: 13px; color: var(--text); }
 .btn-x { color: var(--text-3); font-size: 12px; }
 .btn-x:hover { color: var(--c-urgent); }
+.btn-x--confirm { color: var(--c-urgent); font-weight: 600; font-family: var(--font-mono); font-size: 11px; }
 .saved { color: var(--accent); font-size: 13px; text-align: center; }
 </style>

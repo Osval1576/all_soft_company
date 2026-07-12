@@ -15,3 +15,13 @@ class IsAdminOrSelf(BasePermission):
         if not (request.user and request.user.is_authenticated):
             return False
         return getattr(request.user, "role", None) == "ADMIN" or obj.id == request.user.id
+
+
+class IsAdminRole(BasePermission):
+    message = "Solo administradores."
+
+    def has_permission(self, request, view):
+        u = request.user
+        if not (u and u.is_authenticated):
+            return False
+        return bool(u.is_superuser or getattr(u, "role", None) == "ADMIN")

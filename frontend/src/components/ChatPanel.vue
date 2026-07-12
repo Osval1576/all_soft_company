@@ -105,6 +105,7 @@ import { getTicketMessages, getTicketEvents, uploadAttachment } from "../api/tic
 import { useAuthStore } from "../stores/auth.store";
 import { useNotificationsStore } from "../stores/notifications.store";
 import { useWsConnection } from "../composables/useWsConnection";
+import { prettySize } from "../utils/prettySize.js";
 import TicketEventTimeline from "./tickets/TicketEventTimeline.vue";
 import MessageAttachment from "./tickets/MessageAttachment.vue";
 import CsatPrompt from "./tickets/CsatPrompt.vue";
@@ -150,11 +151,6 @@ function onFilePicked(e) {
 function clearPending() { pendingFile.value = null; }
 function onCsatSubmitted(payload) {
   emit("csat-submitted", payload);
-}
-function prettySize(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 const CONN_LABEL = {
@@ -218,7 +214,7 @@ async function send() {
       pendingFile.value = null;
       draft.value = "";
     } catch (err) {
-      alert(err?.response?.data?.detail || "No se pudo subir el archivo.");
+      notif.pushToast({ title: err?.response?.data?.detail || "No se pudo subir el archivo.", tone: "error" });
     } finally {
       uploading.value = false;
     }

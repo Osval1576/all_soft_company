@@ -1,20 +1,11 @@
 from rest_framework import mixins, viewsets
-from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from users.permissions import IsAdminRole
+
 from .models import SlaConfig, SlaPolicy, Holiday
 from .serializers import SlaConfigSerializer, SlaPolicySerializer, HolidaySerializer
-
-
-class IsAdminRole(BasePermission):
-    message = "Solo administradores."
-
-    def has_permission(self, request, view):
-        u = request.user
-        if not (u and u.is_authenticated):
-            return False
-        return bool(u.is_superuser or getattr(u, "role", None) == "ADMIN")
 
 
 class ConfigView(APIView):

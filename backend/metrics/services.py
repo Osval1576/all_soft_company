@@ -37,7 +37,8 @@ def csat_summary(qs):
     for row in (qs.filter(csat__isnull=False)
                   .values("csat__score")
                   .annotate(n=Count("csat__score"))):
-        distribution[row["csat__score"]] = row["n"]
+        if row["csat__score"] in distribution:
+            distribution[row["csat__score"]] = row["n"]
     return {"average": agg["average"], "count": agg["count"], "distribution": distribution}
 
 

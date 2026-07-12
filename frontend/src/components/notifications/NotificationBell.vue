@@ -1,6 +1,12 @@
 <template>
   <div class="bell-wrap">
-    <button class="bell-btn" @click.stop="toggle" aria-label="Notificaciones">
+    <button
+      class="bell-btn"
+      @click.stop="toggle"
+      :aria-expanded="open ? 'true' : 'false'"
+      aria-haspopup="true"
+      :aria-label="bellLabel"
+    >
       <i class="ti ti-bell" aria-hidden="true"></i>
       <span v-if="store.unreadCount > 0" class="bell-badge">{{ badgeText }}</span>
     </button>
@@ -34,6 +40,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import { useNotificationsStore } from "../../stores/notifications.store";
 import { useAuthStore } from "../../stores/auth.store";
+import { dashboardRoute } from "../../utils/dashboardRoute.js";
 
 const store = useNotificationsStore();
 const auth = useAuthStore();
@@ -41,21 +48,18 @@ const router = useRouter();
 const open = ref(false);
 
 const badgeText = computed(() => (store.unreadCount > 9 ? "9+" : String(store.unreadCount)));
+const bellLabel = computed(() =>
+  store.unreadCount > 0 ? `Notificaciones, ${store.unreadCount} sin leer` : "Notificaciones"
+);
 
 function toggle() {
   open.value = !open.value;
 }
 
-function dashboardRoute() {
-  if (auth.user?.is_superuser) return { name: "admin" };
-  if (auth.user?.is_staff) return { name: "tecnico-inbox" };
-  return { name: "cliente" };
-}
-
 function onItem(n) {
   store.markRead(n.id);
   open.value = false;
-  const target = dashboardRoute();
+  const target = dashboardRoute(auth.user);
   if (n.ticket) target.query = { ticket: n.ticket };
   router.push(target);
 }
@@ -63,8 +67,17 @@ function onItem(n) {
 function onDocClick() {
   open.value = false;
 }
-onMounted(() => document.addEventListener("click", onDocClick));
-onBeforeUnmount(() => document.removeEventListener("click", onDocClick));
+function onKeydown(e) {
+  if (e.key === "Escape" && open.value) open.value = false;
+}
+onMounted(() => {
+  document.addEventListener("click", onDocClick);
+  document.addEventListener("keydown", onKeydown);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener("click", onDocClick);
+  document.removeEventListener("keydown", onKeydown);
+});
 </script>
 
 <style scoped>

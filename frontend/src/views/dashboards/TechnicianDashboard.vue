@@ -60,6 +60,13 @@
               <option value="prioridad">Orden: prioridad</option>
               <option value="created_at">Orden: fecha</option>
             </select>
+            <button
+              type="button"
+              class="sort-dir-btn"
+              @click="tf.toggleSort(tf.sortKey.value)"
+              :aria-label="tf.sortDir.value === 'asc' ? 'Orden ascendente, cambiar a descendente' : 'Orden descendente, cambiar a ascendente'"
+              :title="tf.sortDir.value === 'asc' ? 'Ascendente' : 'Descendente'"
+            >{{ tf.sortDir.value === 'asc' ? '↑' : '↓' }}</button>
           </div>
           <aside class="ticket-list">
             <div v-if="loading" class="list-state">Cargando...</div>
@@ -120,6 +127,9 @@ import PriorityDot from "../../components/PriorityDot.vue";
 import SlaBadge from "../../components/tickets/SlaBadge.vue";
 import { listMyTickets, updateTicket, getPool, takeTicket } from "../../api/tickets.api";
 import { useTicketFilters } from "../../composables/useTicketFilters.js";
+import { useNotificationsStore } from "../../stores/notifications.store";
+
+const notif = useNotificationsStore();
 
 const TABS = [
   { id: "mine", label: "Mis tickets" },
@@ -171,10 +181,10 @@ async function onTake(ticket) {
     activeTab.value = "mine";
   } catch (e) {
     if (e?.response?.status === 409) {
-      alert("Otro técnico tomó este ticket.");
+      notif.pushToast({ title: "Otro técnico tomó este ticket.", tone: "error" });
       await loadPool();
     } else {
-      alert("No se pudo tomar el ticket.");
+      notif.pushToast({ title: "No se pudo tomar el ticket.", tone: "error" });
     }
   }
 }
@@ -187,7 +197,7 @@ async function onStatusChange(newStatus) {
     if (idx !== -1) mine.value[idx] = updated;
     selectedTicket.value = updated;
   } catch (e) {
-    alert(e?.response?.data?.estado?.[0] || "No se pudo cambiar el estado.");
+    notif.pushToast({ title: e?.response?.data?.estado?.[0] || "No se pudo cambiar el estado.", tone: "error" });
   }
 }
 
@@ -282,6 +292,18 @@ onMounted(async () => {
   color: var(--text);
   font-size: 12px;
 }
+.sort-dir-btn {
+  flex-shrink: 0;
+  width: 30px;
+  padding: 6px 0;
+  border: 0.5px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+.sort-dir-btn:hover { background: var(--border); color: var(--text); }
 .ticket-list {
   background: var(--surface);
   border: 0.5px solid var(--border);

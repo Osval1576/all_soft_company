@@ -30,9 +30,11 @@
 import { ref, computed, onMounted } from "vue";
 import AppTopBar from "../../components/AppTopBar.vue";
 import { useAuthStore } from "../../stores/auth.store";
+import { useNotificationsStore } from "../../stores/notifications.store";
 import { getNotifPreferences, updateNotifPreferences } from "../../api/notifications.api";
 
 const auth = useAuthStore();
+const notif = useNotificationsStore();
 const loading = ref(true);
 const saved = ref(false);
 const prefs = ref({});
@@ -55,17 +57,25 @@ const visibleOptions = computed(() =>
 );
 
 async function onToggle(field, value) {
+  const prev = prefs.value[field];
   prefs.value[field] = value;
   saved.value = false;
-  const updated = await updateNotifPreferences({ [field]: value });
-  prefs.value = updated;
-  saved.value = true;
-  setTimeout(() => (saved.value = false), 1500);
+  try {
+    const updated = await updateNotifPreferences({ [field]: value });
+    prefs.value = updated;
+    saved.value = true;
+    setTimeout(() => (saved.value = false), 1500);
+  } catch (_) {
+    prefs.value[field] = prev;
+    notif.pushToast({ title: "No se pudo guardar la preferencia.", tone: "error" });
+  }
 }
 
 onMounted(async () => {
   try {
     prefs.value = await getNotifPreferences();
+  } catch (_) {
+    notif.pushToast({ title: "No se pudieron cargar las preferencias.", tone: "error" });
   } finally {
     loading.value = false;
   }

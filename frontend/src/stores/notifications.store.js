@@ -82,6 +82,12 @@ export const useNotificationsStore = defineStore("notifications", {
       setTimeout(() => this.dismissToast(id), 5000);
     },
 
+    // Toast ad-hoc de cliente (errores/avisos que no vienen del servidor).
+    // Reusa el mismo contenedor visual que las notificaciones en vivo.
+    pushToast({ title, body = "", tone = "info" } = {}) {
+      this._pushToast({ title, body, tone, client: true });
+    },
+
     dismissToast(id) {
       this.toasts = this.toasts.filter((t) => t.toastId !== id);
     },
@@ -92,21 +98,34 @@ export const useNotificationsStore = defineStore("notifications", {
 
     async markRead(id) {
       const n = this.items.find((x) => x.id === id);
-      if (n && !n.is_read) {
+      const wasUnread = !!(n && !n.is_read);
+      if (wasUnread) {
         n.is_read = true;
         this.unreadCount = Math.max(0, this.unreadCount - 1);
       }
       try {
         await apiMarkRead(id);
-      } catch (_) {}
+      } catch (_) {
+        if (wasUnread) {
+          n.is_read = false;
+          this.unreadCount += 1;
+        }
+        this.pushToast({ title: "No se pudo marcar como leída.", tone: "error" });
+      }
     },
 
     async markAllRead() {
+      const prevUnreadCount = this.unreadCount;
+      const prevStates = this.items.map((n) => ({ n, wasRead: n.is_read }));
       this.items.forEach((n) => (n.is_read = true));
       this.unreadCount = 0;
       try {
         await apiMarkAllRead();
-      } catch (_) {}
+      } catch (_) {
+        prevStates.forEach(({ n, wasRead }) => (n.is_read = wasRead));
+        this.unreadCount = prevUnreadCount;
+        this.pushToast({ title: "No se pudieron marcar todas como leídas.", tone: "error" });
+      }
     },
 
     _startPing() {

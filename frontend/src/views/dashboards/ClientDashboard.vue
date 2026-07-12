@@ -202,7 +202,7 @@ onMounted(load);
 }
 .ticket-list {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 0.5px solid var(--border);
   border-radius: var(--r);
   display: flex;
   flex-direction: column;
@@ -213,13 +213,13 @@ onMounted(load);
   display: flex;
   gap: 8px;
   padding: 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0.5px solid var(--border);
   flex-shrink: 0;
 }
 .search-input {
   flex: 1;
   padding: 7px 10px;
-  border: 1px solid var(--border);
+  border: 0.5px solid var(--border);
   border-radius: var(--r-sm);
   background: var(--surface-2);
   color: var(--text);
@@ -250,7 +250,7 @@ onMounted(load);
   width: 100%;
   text-align: left;
   padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0.5px solid var(--border);
   cursor: pointer;
   transition: background .1s;
   display: flex;
@@ -287,7 +287,7 @@ onMounted(load);
   justify-content: center;
   gap: 10px;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 0.5px solid var(--border);
   border-radius: var(--r);
   box-shadow: var(--shadow-sm);
 }
@@ -306,7 +306,7 @@ onMounted(load);
 }
 .modal {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 0.5px solid var(--border);
   border-radius: var(--r-lg);
   width: 100%;
   max-width: 480px;
@@ -317,7 +317,7 @@ onMounted(load);
   align-items: center;
   justify-content: space-between;
   padding: 18px 20px 14px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0.5px solid var(--border);
 }
 .modal-title { font-weight: 600; font-size: 15px; color: var(--text); }
 .modal-close {
@@ -342,7 +342,7 @@ onMounted(load);
 .label { font-size: 12px; font-weight: 600; color: var(--text-2); letter-spacing: .3px; }
 .input, .textarea, .select {
   padding: 9px 12px;
-  border: 1px solid var(--border);
+  border: 0.5px solid var(--border);
   border-radius: var(--r-sm);
   background: var(--surface-2);
   color: var(--text);
@@ -368,7 +368,7 @@ onMounted(load);
   padding: 8px 16px;
   border-radius: var(--r-sm);
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 0.5px solid var(--border);
   color: var(--text-2);
   font-size: 13px;
   font-weight: 500;

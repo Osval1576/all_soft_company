@@ -4,9 +4,6 @@ from rest_framework import serializers
 from .models import Ticket
 from .models import TicketMessage
 from .models import TicketEvent
-from rest_framework import viewsets
-from rest_framework.decorators import action
-from rest_framework.response import Response
 
 def role(user):
     return getattr(user, "role", None)

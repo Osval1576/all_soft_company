@@ -26,18 +26,14 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { fetchAttachmentBlob } from "../../api/tickets.api";
+import { prettySize } from "../../utils/prettySize.js";
+import { useNotificationsStore } from "../../stores/notifications.store";
 
 const props = defineProps({ att: { type: Object, required: true } });
 
+const notif = useNotificationsStore();
 const objectUrl = ref(null);
 const error = ref(false);
-
-function prettySize(bytes) {
-  if (!bytes && bytes !== 0) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
 
 async function loadImage() {
   try {
@@ -62,7 +58,7 @@ async function download() {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch (_) {
-    alert("No se pudo descargar el archivo.");
+    notif.pushToast({ title: "No se pudo descargar el archivo.", tone: "error" });
   }
 }
 

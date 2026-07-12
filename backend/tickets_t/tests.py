@@ -57,7 +57,7 @@ class StateTransitionTests(TestCase):
         self.assertEqual(r.status_code, 400)
 
 
-class PoolAndTakeTests(TestCase, ):
+class PoolAndTakeTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_user(username="adm2", password="x", role="ADMIN")
         self.agent1 = User.objects.create_user(username="ag1", password="x", role="AGENT")
@@ -182,6 +182,14 @@ class AttachmentModelTests(TestCase):
 
     def test_validate_attachment_rejects_fake_pdf(self):
         f = SimpleUploadedFile("x.pdf", b"noPDF", content_type="application/pdf")
+        with self.assertRaises(DjangoValidationError):
+            validate_attachment(f)
+
+    def test_validate_attachment_rejects_oversized_image(self):
+        from tickets_t.validators import IMAGE_MAX_BYTES
+        f = SimpleUploadedFile(
+            "big.png", b"\x00" * (IMAGE_MAX_BYTES + 1), content_type="image/png",
+        )
         with self.assertRaises(DjangoValidationError):
             validate_attachment(f)
 

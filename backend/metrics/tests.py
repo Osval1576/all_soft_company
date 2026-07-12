@@ -114,6 +114,20 @@ class ComplianceTests(MetricsFactoryMixin, TestCase):
         self.assertIsNone(out["resolution"])
         self.assertIsNone(out["first_response"])
 
+    def test_first_response_compliance_late(self):
+        base = timezone.now()
+        t = self.make_ticket()
+        self._set_sla(t, fr_met=base + timedelta(minutes=45), fr_due=base + timedelta(minutes=30))
+        out = services.compliance(services.windowed_tickets(30))
+        self.assertEqual(out["first_response"], 0.0)
+
+    def test_resolution_compliance_excludes_partial_null(self):
+        base = timezone.now()
+        t_partial = self.make_ticket(estado="RESOLVED")
+        self._set_sla(t_partial, res_at=base, res_due=None)  # resolution_due_at ausente
+        out = services.compliance(services.windowed_tickets(30))
+        self.assertIsNone(out["resolution"])  # no cuenta en el denominador
+
 
 class AvgTimesTests(MetricsFactoryMixin, TestCase):
     def test_resolution_avg_business_minutes(self):

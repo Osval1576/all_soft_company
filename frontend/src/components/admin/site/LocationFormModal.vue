@@ -52,11 +52,13 @@
 import { reactive, ref, onMounted } from "vue";
 import { Loader } from "@googlemaps/js-api-loader";
 import { landingAdminApi } from "../../../api/landing.api";
+import { useNotificationsStore } from "../../../stores/notifications.store";
 import I18nField from "./I18nField.vue";
 import ImageDrop from "./ImageDrop.vue";
 
 const props = defineProps({ location: Object });
 const emit = defineEmits(["close", "saved"]);
+const notif = useNotificationsStore();
 
 const form = reactive({
   name: props.location?.name || "",
@@ -84,7 +86,10 @@ let mapInstance = null;
 async function initMap() {
   const settings = await landingAdminApi.getSettings();
   const key = settings.google_maps_api_key;
-  if (!key) { alert("Configura primero la Google Maps API key en Contenido del sitio."); return; }
+  if (!key) {
+    notif.pushToast({ title: "Configura primero la Google Maps API key en Contenido del sitio.", tone: "error" });
+    return;
+  }
   const loader = new Loader({ apiKey: key, version: "weekly", libraries: ["maps", "marker", "places"] });
   const { Map } = await loader.importLibrary("maps");
   const { Marker } = await loader.importLibrary("marker");
