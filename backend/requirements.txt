@@ -9,3 +9,4 @@ Pillow>=10.0
 django-cleanup>=8.0
 channels-redis==4.3.0
 django-redis==7.0.0
+redis==8.0.1
