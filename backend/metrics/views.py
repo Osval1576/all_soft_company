@@ -13,6 +13,8 @@ class AdminMetricsView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request):
+        if request.organization is None:
+            return Response({"detail": "Sin organización."}, status=404)
         window = services._parse_window(request)
         cal = get_calendar(request.organization)
         qs = services.windowed_tickets(window)
@@ -31,6 +33,8 @@ class MyMetricsView(APIView):
     permission_classes = [IsAuthenticated, IsAgent]
 
     def get(self, request):
+        if request.organization is None:
+            return Response({"detail": "Sin organización."}, status=404)
         window = services._parse_window(request)
         cal = get_calendar(request.organization)
         team = services.windowed_tickets(window)

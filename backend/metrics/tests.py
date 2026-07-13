@@ -275,6 +275,15 @@ class EndpointTests(MetricsFactoryMixin, TestCase):
         self.assertEqual(self.client.get("/api/metrics/admin/?window=999").data["window"], 30)
         self.assertEqual(self.client.get("/api/metrics/admin/?window=abc").data["window"], 30)
 
+    def test_admin_endpoint_platform_superuser_without_org_returns_404(self):
+        # Superuser de plataforma (organization=None) no debe 500 al pegarle
+        # a metricas scoped por organizacion: 404 explicito antes de get_calendar().
+        su = User.objects.create_user(
+            "platform_su_metrics", role="ADMIN", is_superuser=True, organization=None)
+        self.client.force_authenticate(su)
+        r = self.client.get("/api/metrics/admin/")
+        self.assertEqual(r.status_code, 404)
+
     def test_admin_query_count_independent_of_ticket_count(self):
         from django.db import connection
         from django.test.utils import CaptureQueriesContext

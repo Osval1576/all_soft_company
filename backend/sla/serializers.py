@@ -5,7 +5,7 @@ from .models import SlaConfig, SlaPolicy, Holiday
 class SlaConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = SlaConfig
-        exclude = ["id"]
+        exclude = ["id", "organization"]
 
 
 class SlaPolicySerializer(serializers.ModelSerializer):

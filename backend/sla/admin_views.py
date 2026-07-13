@@ -12,10 +12,14 @@ class ConfigView(APIView):
     permission_classes = [IsAdminRole]
 
     def get(self, request):
+        if request.organization is None:
+            return Response({"detail": "Sin organización."}, status=404)
         cfg = SlaConfig.objects.get(organization=request.organization)
         return Response(SlaConfigSerializer(cfg).data)
 
     def patch(self, request):
+        if request.organization is None:
+            return Response({"detail": "Sin organización."}, status=404)
         cfg = SlaConfig.objects.get(organization=request.organization)
         ser = SlaConfigSerializer(cfg, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
@@ -31,6 +35,8 @@ class PoliciesView(APIView):
         return Response(SlaPolicySerializer(qs, many=True).data)
 
     def patch(self, request):
+        if request.organization is None:
+            return Response({"detail": "Sin organización."}, status=404)
         # request.data es una lista de {priority, first_response_minutes, resolution_minutes}
         for row in request.data:
             obj = SlaPolicy.objects.filter(

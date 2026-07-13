@@ -341,6 +341,42 @@ class AdminApiTests(TestCase):
         self.assertEqual(c.get("/api/admin/sla/holidays/").status_code, 200)
         self.assertEqual(c.delete(f"/api/admin/sla/holidays/{hid}/").status_code, 204)
 
+    def test_config_serializer_does_not_expose_organization_as_writable(self):
+        # PATCHear organization no debe reasignar el OneToOne (exposicion del
+        # boundary de tenant); el campo debe ser ignorado por el serializer.
+        other_org = create_org("SLT2")
+        c = self._c(self.admin)
+        cfg_before = SlaConfig.objects.get(organization=self.org)
+        r = c.patch("/api/admin/sla/config/", {"organization": other_org.id}, format="json")
+        self.assertEqual(r.status_code, 200)
+        # sigue existiendo con el mismo pk bajo self.org: el PATCH no reasigno
+        # el OneToOne al mandar "organization" en el payload (campo ignorado).
+        cfg_after = SlaConfig.objects.get(organization=self.org)
+        self.assertEqual(cfg_after.pk, cfg_before.pk)
+
+
+class PlatformSuperuserNoOrgTests(TestCase):
+    """Superuser de plataforma (organization=None) no debe recibir 500 al
+    pegarle a endpoints scoped por organizacion: debe ser un 404 explicito."""
+
+    def setUp(self):
+        self.org = create_org("PSU1")
+        self.superuser = User.objects.create_user(
+            username="platform_su", password="x", role="ADMIN",
+            is_superuser=True, organization=None,
+        )
+
+    def _c(self):
+        c = APIClient(); c.force_authenticate(user=self.superuser); return c
+
+    def test_sla_config_get_returns_404_not_500(self):
+        r = self._c().get("/api/admin/sla/config/")
+        self.assertEqual(r.status_code, 404)
+
+    def test_sla_config_patch_returns_404_not_500(self):
+        r = self._c().patch("/api/admin/sla/config/", {"at_risk_threshold_pct": 40}, format="json")
+        self.assertEqual(r.status_code, 404)
+
 
 from io import StringIO
 from unittest import mock
@@ -396,3 +432,47 @@ class PerOrgSlaTests(TestCase):
         org = Organization.objects.create(name="Nueva", slug="NEW")
         self.assertTrue(SlaConfig.objects.filter(organization=org).exists())
         self.assertEqual(SlaPolicy.objects.filter(organization=org).count(), 4)
+
+
+@override_settings(NOTIFICATIONS_EMAIL_ASYNC=False)
+class SchedulerEnabledPerOrgTests(TestCase):
+    """scheduler_enabled=False debe excluir la org del barrido de run_sla_check(),
+    no sólo regular la cadencia del loop del comando de management."""
+
+    def setUp(self):
+        self.org_on = create_org("SCH1")
+        self.org_off = create_org("SCH2")
+        cfg_off = SlaConfig.objects.get(organization=self.org_off)
+        cfg_off.scheduler_enabled = False
+        cfg_off.save()
+
+    def _breached_ticket(self, org, suffix):
+        agent = User.objects.create_user(username=f"ag_{suffix}", password="x", role="AGENT", organization=org)
+        customer = User.objects.create_user(username=f"cu_{suffix}", password="x", role="CUSTOMER", organization=org)
+        t = Ticket.objects.create(
+            reference=f"ALS-20260101-0007{suffix}", titulo="T", descripcion="d",
+            prioridad="HIGH", estado="OPEN", creado_por=customer, asignado_a=agent,
+            organization=org,
+        )
+        ts = t.sla
+        ts.first_response_met_at = timezone.now()
+        ts.fr_level = "met"
+        ts.resolution_due_at = timezone.now() - timezone.timedelta(hours=1)
+        ts.res_level = "ok"
+        ts.save()
+        return t
+
+    def test_scheduler_disabled_org_is_skipped(self):
+        t_on = self._breached_ticket(self.org_on, "10")
+        t_off = self._breached_ticket(self.org_off, "20")
+
+        run_sla_check()
+
+        t_on.sla.refresh_from_db()
+        t_off.sla.refresh_from_db()
+        self.assertEqual(t_on.sla.res_level, "breached")
+        self.assertEqual(t_off.sla.res_level, "ok")  # org deshabilitada: no se toca
+        self.assertTrue(
+            Notification.objects.filter(kind="sla_breached", ticket=t_on).exists())
+        self.assertFalse(
+            Notification.objects.filter(kind="sla_breached", ticket=t_off).exists())
