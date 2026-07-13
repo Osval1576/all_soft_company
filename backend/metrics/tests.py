@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from tenancy.testing import create_org
 from tickets_t.models import Ticket
 from csat.models import CSATResponse
 from sla.models import SlaConfig, SlaPolicy
@@ -32,8 +33,9 @@ class MetricsFactoryMixin:
 
     def setUp(self):
         _seed_sla()
-        self.customer = User.objects.create_user("cust", role="CUSTOMER")
-        self.tech = User.objects.create_user("tech", role="AGENT")
+        self.org = create_org("MET")
+        self.customer = User.objects.create_user("cust", role="CUSTOMER", organization=self.org)
+        self.tech = User.objects.create_user("tech", role="AGENT", organization=self.org)
 
     def make_ticket(self, *, estado="OPEN", created=None, asignado=None, prioridad="MEDIUM"):
         MetricsFactoryMixin._n += 1
@@ -42,6 +44,7 @@ class MetricsFactoryMixin:
             titulo="t", descripcion="d", prioridad=prioridad, estado=estado,
             creado_por=self.customer, asignado_a=asignado,
             created_at=created or timezone.now(),
+            organization=self.org,
         )
 
 
@@ -191,7 +194,7 @@ class RankingTests(MetricsFactoryMixin, TestCase):
     def test_ranking_groups_by_technician_and_sorts(self):
         cal = get_calendar()
         base = timezone.now()
-        tech2 = User.objects.create_user("tech2", role="AGENT", first_name="Ana", last_name="Paz")
+        tech2 = User.objects.create_user("tech2", role="AGENT", first_name="Ana", last_name="Paz", organization=self.org)
         # tech: 1 resuelto a tiempo (sla_pct=1.0)
         t1 = self.make_ticket(estado="RESOLVED", asignado=self.tech)
         ts = t1.sla; ts.resolved_at = base; ts.resolution_due_at = base + timedelta(hours=1); ts.save()
@@ -220,7 +223,7 @@ class RankingTests(MetricsFactoryMixin, TestCase):
         ts.save()
         CSATResponse.objects.create(ticket=t1, score=5)
         # técnico con sólo un ticket OPEN (sin desenlace) -> sla_pct None, csat None
-        tech3 = User.objects.create_user("tech3r", role="AGENT")
+        tech3 = User.objects.create_user("tech3r", role="AGENT", organization=self.org)
         self.make_ticket(estado="OPEN", asignado=tech3)
         rows = services.technician_ranking(services.windowed_tickets(30), cal)
         self.assertEqual(rows[-1]["technician_id"], tech3.id)   # None al final
@@ -233,7 +236,7 @@ class RankingTests(MetricsFactoryMixin, TestCase):
 class EndpointTests(MetricsFactoryMixin, TestCase):
     def setUp(self):
         super().setUp()
-        self.admin = User.objects.create_user("admin", role="ADMIN")
+        self.admin = User.objects.create_user("admin", role="ADMIN", organization=self.org)
         self.client = APIClient()
 
     def test_admin_endpoint_requires_admin(self):
@@ -248,7 +251,7 @@ class EndpointTests(MetricsFactoryMixin, TestCase):
         self.assertEqual(r.data["window"], 30)
 
     def test_me_endpoint_scopes_to_self_and_has_benchmark(self):
-        tech2 = User.objects.create_user("tech2b", role="AGENT")
+        tech2 = User.objects.create_user("tech2b", role="AGENT", organization=self.org)
         self.make_ticket(estado="RESOLVED", asignado=self.tech)
         self.make_ticket(estado="RESOLVED", asignado=tech2)
         self.client.force_authenticate(self.tech)

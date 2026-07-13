@@ -27,7 +27,9 @@ class _AdminAuthMixin:
         return c
 
     def _customer_client(self):
-        u = User.objects.create_user(username="cu", password="x", role="CUSTOMER")
+        from tenancy.testing import create_org
+        u = User.objects.create_user(username="cu", password="x", role="CUSTOMER",
+                                     organization=create_org("LCM"))
         c = APIClient()
         c.force_authenticate(user=u)
         return c

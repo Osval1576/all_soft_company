@@ -66,3 +66,31 @@ class SeedMigrationTests(TestCase):
         mod.seed_org(global_apps, None)
         mod.seed_org(global_apps, None)
         self.assertEqual(Organization.objects.filter(slug="ALS").count(), 1)
+
+
+from rest_framework.test import APIClient
+
+
+class MiddlewareTests(TestCase):
+    def setUp(self):
+        from .testing import create_org
+        self.org = create_org("MWA")
+        self.client_api = APIClient()
+
+    def test_user_sin_org_403(self):
+        u = User.objects.create_user("sinorg", role="CUSTOMER")
+        self.client_api.force_authenticate(u)
+        r = self.client_api.get("/api/tickets_t/")
+        self.assertEqual(r.status_code, 403)
+        self.assertIn("organización", r.json()["detail"].lower())
+
+    def test_org_suspendida_403(self):
+        self.org.is_active = False
+        self.org.save()
+        u = User.objects.create_user("susp", role="CUSTOMER", organization=self.org)
+        self.client_api.force_authenticate(u)
+        r = self.client_api.get("/api/tickets_t/")
+        self.assertEqual(r.status_code, 403)
+
+    def test_health_y_auth_exentos(self):
+        self.assertEqual(self.client_api.get("/api/health/").status_code, 200)

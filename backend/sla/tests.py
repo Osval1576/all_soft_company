@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from tenancy.testing import create_org
 from tickets_t.models import Ticket, TicketMessage, TicketEvent
 from sla.models import SlaConfig, SlaPolicy, TicketSla
 from sla.calendar_engine import Calendar, add_business_time, business_minutes_between
@@ -47,10 +48,12 @@ class ModelTests(TestCase):
         self.assertEqual(urgent.resolution_minutes, 240)
 
     def test_ticket_sla_onetoone(self):
-        cu = User.objects.create_user(username="c", password="x", role="CUSTOMER")
+        org = create_org("SLT")
+        cu = User.objects.create_user(username="c", password="x", role="CUSTOMER", organization=org)
         t = Ticket.objects.create(
             reference="ALS-20260101-000500", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="OPEN", creado_por=cu,
+            organization=org,
         )
         # El signal de creacion (Task 4) ya crea un TicketSla automaticamente;
         # se limpia para probar el modelo/relacion OneToOne en aislamiento.
@@ -113,10 +116,12 @@ class CalendarTests(TestCase):
 
 class LevelTests(TestCase):
     def setUp(self):
-        cu = User.objects.create_user(username="lc", password="x", role="CUSTOMER")
+        self.org = create_org("SLT")
+        cu = User.objects.create_user(username="lc", password="x", role="CUSTOMER", organization=self.org)
         self.t = Ticket.objects.create(
             reference="ALS-20260101-000510", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="OPEN", creado_por=cu,
+            organization=self.org,
         )
 
     def _sla(self, **kw):
@@ -153,14 +158,16 @@ class LevelTests(TestCase):
 
 class SignalTests(TestCase):
     def setUp(self):
-        self.agent = User.objects.create_user(username="sg_ag", password="x", role="AGENT")
-        self.customer = User.objects.create_user(username="sg_cu", password="x", role="CUSTOMER")
+        self.org = create_org("SLT")
+        self.agent = User.objects.create_user(username="sg_ag", password="x", role="AGENT", organization=self.org)
+        self.customer = User.objects.create_user(username="sg_cu", password="x", role="CUSTOMER", organization=self.org)
 
     def _ticket(self, prioridad="MEDIUM"):
         return Ticket.objects.create(
             reference=f"ALS-20260101-0006{prioridad[:2]}", titulo="T", descripcion="d",
             prioridad=prioridad, estado="OPEN",
             creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org,
         )
 
     def test_ticket_creation_creates_sla_with_budgets(self):
@@ -214,14 +221,16 @@ class SignalTests(TestCase):
 @override_settings(NOTIFICATIONS_EMAIL_ASYNC=False)
 class CheckerTests(TestCase):
     def setUp(self):
-        self.agent = User.objects.create_user(username="ck_ag", password="x", role="AGENT")
-        self.admin = User.objects.create_user(username="ck_adm", password="x", role="ADMIN")
-        self.customer = User.objects.create_user(username="ck_cu", password="x", role="CUSTOMER")
+        self.org = create_org("SLT")
+        self.agent = User.objects.create_user(username="ck_ag", password="x", role="AGENT", organization=self.org)
+        self.admin = User.objects.create_user(username="ck_adm", password="x", role="ADMIN", organization=self.org)
+        self.customer = User.objects.create_user(username="ck_cu", password="x", role="CUSTOMER", organization=self.org)
 
     def _ticket_with_breached_res(self):
         t = Ticket.objects.create(
             reference="ALS-20260101-000800", titulo="T", descripcion="d",
             prioridad="HIGH", estado="OPEN", creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org,
         )
         ts = t.sla
         # forzar reloj de resolución vencido y 1a respuesta ya cumplida
@@ -256,10 +265,12 @@ from rest_framework.test import APIClient
 
 class SerializerSlaTests(TestCase):
     def setUp(self):
-        self.customer = User.objects.create_user(username="ss_cu", password="x", role="CUSTOMER")
+        self.org = create_org("SLT")
+        self.customer = User.objects.create_user(username="ss_cu", password="x", role="CUSTOMER", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-000900", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="OPEN", creado_por=self.customer,
+            organization=self.org,
         )
 
     def test_ticket_payload_includes_sla(self):
@@ -280,6 +291,7 @@ class SerializerSlaTests(TestCase):
         Ticket.objects.create(
             reference="ALS-20260101-000901", titulo="T2", descripcion="d",
             prioridad="MEDIUM", estado="OPEN", creado_por=self.customer,
+            organization=self.org,
         )
         c = APIClient()
         c.force_authenticate(user=self.customer)
@@ -291,8 +303,9 @@ class SerializerSlaTests(TestCase):
 
 class AdminApiTests(TestCase):
     def setUp(self):
-        self.admin = User.objects.create_user(username="aa_adm", password="x", role="ADMIN")
-        self.customer = User.objects.create_user(username="aa_cu", password="x", role="CUSTOMER")
+        self.org = create_org("SLT")
+        self.admin = User.objects.create_user(username="aa_adm", password="x", role="ADMIN", organization=self.org)
+        self.customer = User.objects.create_user(username="aa_cu", password="x", role="CUSTOMER", organization=self.org)
 
     def _c(self, u):
         c = APIClient(); c.force_authenticate(user=u); return c

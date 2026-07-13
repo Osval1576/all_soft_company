@@ -31,11 +31,14 @@ class HealthEndpointTests(TestCase):
 
 class BackfillRolesTests(TestCase):
     def test_backfill_corrige_legacy_y_no_toca_correctos(self):
+        from tenancy.testing import create_org
+        org = create_org("USR")
         User = get_user_model()
+        # superuser de plataforma: queda sin org a propósito
         legacy_super = User.objects.create_user("gsuper", is_superuser=True, role="CUSTOMER")
-        legacy_staff = User.objects.create_user("gstaff", is_staff=True, role="CUSTOMER")
-        ok_admin = User.objects.create_user("gadmin", role="ADMIN")
-        ok_customer = User.objects.create_user("gcust", role="CUSTOMER")
+        legacy_staff = User.objects.create_user("gstaff", is_staff=True, role="CUSTOMER", organization=org)
+        ok_admin = User.objects.create_user("gadmin", role="ADMIN", organization=org)
+        ok_customer = User.objects.create_user("gcust", role="CUSTOMER", organization=org)
 
         from django.apps import apps as global_apps
         mod = importlib.import_module("users.migrations.0002_backfill_roles")
