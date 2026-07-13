@@ -17,7 +17,7 @@ class AdminMetricsView(APIView):
             return Response({"detail": "Sin organización."}, status=404)
         window = services._parse_window(request)
         cal = get_calendar(request.organization)
-        qs = services.windowed_tickets(window)
+        qs = services.windowed_tickets(window, request.organization)
         return Response({
             "window": window,
             "totals": services.volume_totals(qs),
@@ -37,7 +37,7 @@ class MyMetricsView(APIView):
             return Response({"detail": "Sin organización."}, status=404)
         window = services._parse_window(request)
         cal = get_calendar(request.organization)
-        team = services.windowed_tickets(window)
+        team = services.windowed_tickets(window, request.organization)
         mine = team.filter(asignado_a=request.user)
         return Response({
             "window": window,

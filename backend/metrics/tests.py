@@ -57,7 +57,7 @@ class VolumeAndCsatTests(MetricsFactoryMixin, TestCase):
         self.make_ticket(estado="IN_PROGRESS")
         self.make_ticket(estado="RESOLVED")
         self.make_ticket(estado="CLOSED")
-        qs = services.windowed_tickets(30)
+        qs = services.windowed_tickets(30, self.org)
         self.assertEqual(services.volume_totals(qs),
                          {"total": 4, "resolved": 2, "open": 2})
 
@@ -66,7 +66,7 @@ class VolumeAndCsatTests(MetricsFactoryMixin, TestCase):
             t = self.make_ticket(estado="RESOLVED")
             CSATResponse.objects.create(ticket=t, score=score)
         self.make_ticket(estado="RESOLVED")  # sin CSAT
-        qs = services.windowed_tickets(30)
+        qs = services.windowed_tickets(30, self.org)
         out = services.csat_summary(qs)
         self.assertEqual(out["count"], 3)
         # places=3: MySQL's AVG() on an integer column truncates to 4 decimal
@@ -76,7 +76,7 @@ class VolumeAndCsatTests(MetricsFactoryMixin, TestCase):
         self.assertEqual(out["distribution"], {1: 0, 2: 0, 3: 0, 4: 2, 5: 1})
 
     def test_csat_summary_empty_returns_none(self):
-        qs = services.windowed_tickets(30)
+        qs = services.windowed_tickets(30, self.org)
         out = services.csat_summary(qs)
         self.assertIsNone(out["average"])
         self.assertEqual(out["count"], 0)
@@ -84,8 +84,8 @@ class VolumeAndCsatTests(MetricsFactoryMixin, TestCase):
     def test_window_excludes_older_tickets(self):
         self.make_ticket(created=timezone.now() - timedelta(days=40))
         self.make_ticket(created=timezone.now() - timedelta(days=3))
-        self.assertEqual(services.volume_totals(services.windowed_tickets(7))["total"], 1)
-        self.assertEqual(services.volume_totals(services.windowed_tickets(90))["total"], 2)
+        self.assertEqual(services.volume_totals(services.windowed_tickets(7, self.org))["total"], 1)
+        self.assertEqual(services.volume_totals(services.windowed_tickets(90, self.org))["total"], 2)
 
 
 class ComplianceTests(MetricsFactoryMixin, TestCase):
@@ -104,19 +104,19 @@ class ComplianceTests(MetricsFactoryMixin, TestCase):
         t_late = self.make_ticket(estado="RESOLVED")
         self._set_sla(t_late, res_at=base + timedelta(hours=2), res_due=base + timedelta(hours=1))  # tarde
         t_open = self.make_ticket(estado="OPEN")  # sin resolved_at → no cuenta
-        out = services.compliance(services.windowed_tickets(30))
+        out = services.compliance(services.windowed_tickets(30, self.org))
         self.assertAlmostEqual(out["resolution"], 0.5)  # 1 de 2 con desenlace
 
     def test_first_response_compliance(self):
         base = timezone.now()
         t = self.make_ticket()
         self._set_sla(t, fr_met=base, fr_due=base + timedelta(minutes=30))
-        out = services.compliance(services.windowed_tickets(30))
+        out = services.compliance(services.windowed_tickets(30, self.org))
         self.assertEqual(out["first_response"], 1.0)
 
     def test_compliance_none_when_no_outcome(self):
         self.make_ticket(estado="OPEN")
-        out = services.compliance(services.windowed_tickets(30))
+        out = services.compliance(services.windowed_tickets(30, self.org))
         self.assertIsNone(out["resolution"])
         self.assertIsNone(out["first_response"])
 
@@ -124,14 +124,14 @@ class ComplianceTests(MetricsFactoryMixin, TestCase):
         base = timezone.now()
         t = self.make_ticket()
         self._set_sla(t, fr_met=base + timedelta(minutes=45), fr_due=base + timedelta(minutes=30))
-        out = services.compliance(services.windowed_tickets(30))
+        out = services.compliance(services.windowed_tickets(30, self.org))
         self.assertEqual(out["first_response"], 0.0)
 
     def test_resolution_compliance_excludes_partial_null(self):
         base = timezone.now()
         t_partial = self.make_ticket(estado="RESOLVED")
         self._set_sla(t_partial, res_at=base, res_due=None)  # resolution_due_at ausente
-        out = services.compliance(services.windowed_tickets(30))
+        out = services.compliance(services.windowed_tickets(30, self.org))
         self.assertIsNone(out["resolution"])  # no cuenta en el denominador
 
 
@@ -144,7 +144,7 @@ class AvgTimesTests(MetricsFactoryMixin, TestCase):
         ts = t.sla
         ts.resolved_at = datetime(2026, 1, 5, 12, 30, tzinfo=MX)
         ts.save()
-        out = services.avg_times(services.windowed_tickets(3650), cal)
+        out = services.avg_times(services.windowed_tickets(3650, self.org), cal)
         self.assertEqual(out["resolution_min"], 150)
 
     def test_first_response_avg_and_empty(self):
@@ -154,7 +154,7 @@ class AvgTimesTests(MetricsFactoryMixin, TestCase):
         ts = t.sla
         ts.first_response_met_at = datetime(2026, 1, 5, 11, 0, tzinfo=MX)  # 60 min
         ts.save()
-        out = services.avg_times(services.windowed_tickets(3650), cal)
+        out = services.avg_times(services.windowed_tickets(3650, self.org), cal)
         self.assertEqual(out["first_response_min"], 60)
         self.assertIsNone(out["resolution_min"])
 
@@ -168,7 +168,7 @@ class AvgTimesTests(MetricsFactoryMixin, TestCase):
         ts = t.sla
         ts.resolved_at = datetime(2026, 1, 12, 10, 0, tzinfo=MX)
         ts.save()
-        out = services.avg_times(services.windowed_tickets(3650), cal)
+        out = services.avg_times(services.windowed_tickets(3650, self.org), cal)
         self.assertEqual(out["resolution_min"], 120)
 
 
@@ -176,7 +176,7 @@ class TrendTests(MetricsFactoryMixin, TestCase):
     def test_trend_shape_and_zero_fill(self):
         self.make_ticket(created=timezone.now() - timedelta(days=1))
         self.make_ticket(created=timezone.now() - timedelta(days=1))
-        series = services.trend(services.windowed_tickets(7), 7)
+        series = services.trend(services.windowed_tickets(7, self.org), 7)
         self.assertEqual(len(series), 8)                       # window + 1 días
         self.assertEqual(sorted(series, key=lambda r: r["date"]), series)  # asc
         self.assertEqual(sum(r["created"] for r in series), 2)
@@ -188,7 +188,7 @@ class TrendTests(MetricsFactoryMixin, TestCase):
         ts = t.sla
         ts.resolved_at = timezone.now() - timedelta(days=1)
         ts.save()
-        series = services.trend(services.windowed_tickets(7), 7)
+        series = services.trend(services.windowed_tickets(7, self.org), 7)
         self.assertEqual(sum(r["resolved"] for r in series), 1)
         self.assertEqual(sum(r["created"] for r in series), 1)
 
@@ -207,7 +207,7 @@ class RankingTests(MetricsFactoryMixin, TestCase):
         ts2 = t2.sla; ts2.resolved_at = base + timedelta(hours=2); ts2.resolution_due_at = base + timedelta(hours=1); ts2.save()
         # ticket sin asignar → no aparece
         self.make_ticket(estado="OPEN", asignado=None)
-        rows = services.technician_ranking(services.windowed_tickets(30), cal)
+        rows = services.technician_ranking(services.windowed_tickets(30, self.org), cal)
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0]["technician_id"], self.tech.id)   # sla_pct 1.0 primero
         self.assertEqual(rows[0]["sla_pct"], 1.0)
@@ -228,7 +228,7 @@ class RankingTests(MetricsFactoryMixin, TestCase):
         # técnico con sólo un ticket OPEN (sin desenlace) -> sla_pct None, csat None
         tech3 = User.objects.create_user("tech3r", role="AGENT", organization=self.org)
         self.make_ticket(estado="OPEN", asignado=tech3)
-        rows = services.technician_ranking(services.windowed_tickets(30), cal)
+        rows = services.technician_ranking(services.windowed_tickets(30, self.org), cal)
         self.assertEqual(rows[-1]["technician_id"], tech3.id)   # None al final
         self.assertIsNone(rows[-1]["sla_pct"])
         self.assertIsNone(rows[-1]["csat_avg"])
@@ -301,3 +301,15 @@ class EndpointTests(MetricsFactoryMixin, TestCase):
         with CaptureQueriesContext(connection) as ctx2:
             self.client.get("/api/metrics/admin/")
         self.assertEqual(len(ctx2.captured_queries), baseline)
+
+
+class TenantMetricsTests(MetricsFactoryMixin, TestCase):
+    def test_windowed_no_mezcla_orgs(self):
+        from tenancy.testing import create_org
+        other = create_org("MTB")
+        other_cust = User.objects.create_user("mtb_c", role="CUSTOMER", organization=other)
+        Ticket.objects.create(reference="MTB-1", titulo="x", descripcion="d",
+                              creado_por=other_cust, organization=other)
+        self.make_ticket()
+        self.assertEqual(services.volume_totals(services.windowed_tickets(30, self.org))["total"], 1)
+        self.assertEqual(services.volume_totals(services.windowed_tickets(30, None))["total"], 0)

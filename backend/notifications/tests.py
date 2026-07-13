@@ -282,3 +282,19 @@ class SlaNotificationTests(TestCase):
         from notifications.models import Notification
         dispatch("sla_at_risk", self.ticket, actor=None, extra={"clock": "primera respuesta"})
         self.assertEqual(Notification.objects.filter(kind="sla_at_risk").count(), 2)  # agent + admin
+
+
+class TenantNotificationTests(TestCase):
+    def test_ticket_created_no_notifica_admins_de_otra_org(self):
+        from tenancy.testing import create_org
+        a, b = create_org("NTA"), create_org("NTB")
+        admin_a = User.objects.create_user("nta_adm", role="ADMIN", organization=a)
+        admin_b = User.objects.create_user("ntb_adm", role="ADMIN", organization=b)
+        cust_a = User.objects.create_user("nta_cus", role="CUSTOMER", organization=a)
+        t = Ticket.objects.create(reference="NTA-1", titulo="x", descripcion="d",
+                                  creado_por=cust_a, organization=a)
+        dispatch("ticket_created", t)
+        recipients = set(Notification.objects.filter(kind="ticket_created")
+                         .values_list("recipient_id", flat=True))
+        self.assertIn(admin_a.id, recipients)
+        self.assertNotIn(admin_b.id, recipients)
