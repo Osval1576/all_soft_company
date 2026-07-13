@@ -16,6 +16,7 @@ def me(request):
             "is_staff": u.is_staff,
             "is_superuser": u.is_superuser,
             "role": u.role,
+            "organization": u.organization.name if u.organization_id else None,
         }
     )
 
