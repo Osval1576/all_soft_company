@@ -13,6 +13,7 @@
 
     <div class="topbar-right">
       <div class="user-chip">
+        <span v-if="auth.user?.organization" class="org-name">{{ auth.user.organization }}</span>
         <span class="user-name">{{ auth.user?.username }}</span>
         <span class="role-badge">{{ roleLabel }}</span>
       </div>
@@ -79,6 +80,15 @@ const roleLabel = computed(() => {
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 .user-chip { display: flex; align-items: center; gap: 8px; }
 .user-name { font-size: 13px; font-weight: 500; color: var(--text); }
+.org-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding-right: 8px;
+  border-right: 0.5px solid var(--border);
+}
 .role-badge {
   font-size: 10px;
   font-weight: 600;
