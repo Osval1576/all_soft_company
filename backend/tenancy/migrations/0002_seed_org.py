@@ -2,6 +2,11 @@ from django.db import migrations
 
 
 def seed_org(apps, schema_editor):
+    """Barrido TOTAL a la org semilla: TODOS los users y tickets pre-existentes
+    (superusers incluidos) quedan en ALS/"AllSafe" — sin excepciones. El operador
+    de plataforma correcto se crea DESPUES de migrar, a mano, con
+    `createsuperuser` y organization=None (ver spec H1). Idempotente.
+    """
     Organization = apps.get_model("tenancy", "Organization")
     User = apps.get_model("users", "User")
     Ticket = apps.get_model("tickets_t", "Ticket")
