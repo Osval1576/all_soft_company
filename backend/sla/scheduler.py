@@ -20,10 +20,15 @@ def _loop():
     from .checker import run_sla_check
     from .models import SlaConfig
     while True:
+        interval = 10
         try:
-            cfg = SlaConfig.objects.get_solo()
-            interval = max(1, cfg.scheduler_interval_minutes)
-            if cfg.scheduler_enabled:
+            # scheduler por org: una pasada cubre todas las orgs activas; la
+            # cadencia toma el intervalo mas exigente entre orgs activas con
+            # el scheduler habilitado.
+            active_cfgs = list(SlaConfig.objects.filter(
+                organization__is_active=True, scheduler_enabled=True))
+            if active_cfgs:
+                interval = max(1, min(c.scheduler_interval_minutes for c in active_cfgs))
                 run_sla_check()
         except Exception:
             logger.exception("error en el loop del scheduler de SLA")

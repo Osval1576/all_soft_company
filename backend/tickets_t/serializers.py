@@ -44,15 +44,20 @@ class TicketSerializer(serializers.ModelSerializer):
         ts = getattr(obj, "sla", None)
         if ts is None:
             return None
+        if obj.organization_id is None:
+            return None
         from sla.calendar_engine import get_calendar
         from sla.levels import compute_levels
         from django.utils import timezone
         ctx = self.context
-        cal = ctx.get("sla_calendar")
+        # Memoiza por organizacion dentro del request (evita N queries); el
+        # queryset puede incluir tickets de mas de una org (p.ej. vista admin
+        # global antes de que tickets_t quede scoped por org).
+        cache = ctx.setdefault("sla_calendars", {}) if isinstance(ctx, dict) else {}
+        cal = cache.get(obj.organization_id)
         if cal is None:
-            cal = get_calendar()
-            if isinstance(ctx, dict):
-                ctx["sla_calendar"] = cal  # memoiza dentro del request (evita N queries)
+            cal = get_calendar(obj.organization)
+            cache[obj.organization_id] = cal
         levels = compute_levels(ts, timezone.now(), cal)
         return {
             "first_response": {"level": levels["fr"], "due_at": ts.first_response_due_at},

@@ -9,12 +9,14 @@ def create_org(slug="TST", name=None):
     """Crea una org. Idempotente por slug."""
     org, created = Organization.objects.get_or_create(
         slug=slug, defaults={"name": name or f"Org {slug}"})
-    # T4: descomentar (provision de SlaConfig + SlaPolicy per-org, cuando
-    # exista el schema de sla/models.py con FK a Organization)
-    # from sla.models import SlaConfig, SlaPolicy
-    # SlaConfig.objects.get_or_create(organization=org)
-    # for prio, fr, res in _DEFAULT_POLICIES:
-    #     SlaPolicy.objects.get_or_create(
-    #         organization=org, priority=prio,
-    #         defaults={"first_response_minutes": fr, "resolution_minutes": res})
+    # El signal post_save de tenancy.Organization (sla/signals.provision_org_sla)
+    # ya provisiona SlaConfig/SlaPolicy al crear la org; este bloque es un
+    # refuerzo idempotente (get_or_create) por si el signal no corrio (p.ej.
+    # organization ya existia de una corrida anterior sin fixtures limpios).
+    from sla.models import SlaConfig, SlaPolicy
+    SlaConfig.objects.get_or_create(organization=org)
+    for prio, fr, res in _DEFAULT_POLICIES:
+        SlaPolicy.objects.get_or_create(
+            organization=org, priority=prio,
+            defaults={"first_response_minutes": fr, "resolution_minutes": res})
     return org

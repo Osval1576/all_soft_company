@@ -57,10 +57,14 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
-        if self.action != "create":
+        org = getattr(self.request, "organization", None)
+        if self.action != "create" and org is not None:
             try:
                 from sla.calendar_engine import get_calendar
-                ctx["sla_calendar"] = get_calendar()
+                # Precalienta el cache por-org que lee TicketSerializer.get_sla
+                # (evita N+1: 1 sola consulta de config/feriados para el caso
+                # comun de un request con tickets de una sola organizacion).
+                ctx["sla_calendars"] = {org.id: get_calendar(org)}
             except Exception:
                 logger.warning("no se pudo cargar el calendario SLA", exc_info=True)
         return ctx

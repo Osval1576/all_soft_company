@@ -27,9 +27,14 @@ class Command(BaseCommand):
         while True:
             interval_min = 10
             try:
-                cfg = SlaConfig.objects.get_solo()
-                interval_min = max(1, cfg.scheduler_interval_minutes)
-                if cfg.scheduler_enabled:
+                # scheduler por org: una pasada de run_sla_check() cubre todas las
+                # orgs activas (agrupa por calendario internamente); la cadencia del
+                # loop toma el intervalo mas exigente entre las orgs activas con el
+                # scheduler habilitado.
+                active_cfgs = list(SlaConfig.objects.filter(
+                    organization__is_active=True, scheduler_enabled=True))
+                if active_cfgs:
+                    interval_min = max(1, min(c.scheduler_interval_minutes for c in active_cfgs))
                     self._one_pass()
                 else:
                     self.stdout.write("scheduler_enabled=False; pasada omitida.")

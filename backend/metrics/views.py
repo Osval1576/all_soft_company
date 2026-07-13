@@ -14,7 +14,7 @@ class AdminMetricsView(APIView):
 
     def get(self, request):
         window = services._parse_window(request)
-        cal = get_calendar()
+        cal = get_calendar(request.organization)
         qs = services.windowed_tickets(window)
         return Response({
             "window": window,
@@ -32,7 +32,7 @@ class MyMetricsView(APIView):
 
     def get(self, request):
         window = services._parse_window(request)
-        cal = get_calendar()
+        cal = get_calendar(request.organization)
         team = services.windowed_tickets(window)
         mine = team.filter(asignado_a=request.user)
         return Response({

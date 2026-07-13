@@ -31,19 +31,20 @@ def _mx(y, m, d, hh, mm):
 
 
 class ModelTests(TestCase):
-    def test_config_singleton_defaults(self):
-        cfg = SlaConfig.objects.get_solo()
-        self.assertEqual(cfg.pk, 1)
+    def test_config_provisioned_defaults(self):
+        org = create_org("MDT1")
+        cfg = SlaConfig.objects.get(organization=org)
         self.assertEqual(cfg.business_timezone, "America/Mexico_City")
         self.assertEqual(cfg.work_days, "1,2,3,4,5")
         self.assertEqual(cfg.at_risk_threshold_pct, 25)
-        # idempotente
-        self.assertEqual(SlaConfig.objects.get_solo().pk, 1)
-        self.assertEqual(SlaConfig.objects.count(), 1)
+        # idempotente: create_org() de nuevo con el mismo slug no duplica
+        create_org("MDT1")
+        self.assertEqual(SlaConfig.objects.filter(organization=org).count(), 1)
 
     def test_policies_seeded(self):
-        self.assertEqual(SlaPolicy.objects.count(), 4)
-        urgent = SlaPolicy.objects.get(priority="URGENT")
+        org = create_org("MDT2")
+        self.assertEqual(SlaPolicy.objects.filter(organization=org).count(), 4)
+        urgent = SlaPolicy.objects.get(organization=org, priority="URGENT")
         self.assertEqual(urgent.first_response_minutes, 30)
         self.assertEqual(urgent.resolution_minutes, 240)
 
@@ -329,7 +330,8 @@ class AdminApiTests(TestCase):
                      [{"priority": "URGENT", "first_response_minutes": 15, "resolution_minutes": 120}],
                      format="json")
         self.assertEqual(r2.status_code, 200)
-        self.assertEqual(SlaPolicy.objects.get(priority="URGENT").first_response_minutes, 15)
+        self.assertEqual(
+            SlaPolicy.objects.get(organization=self.org, priority="URGENT").first_response_minutes, 15)
 
     def test_holidays_crud(self):
         c = self._c(self.admin)
@@ -348,7 +350,8 @@ from django.core.management import call_command
 
 class CheckSlaLoopTests(TestCase):
     def setUp(self):
-        cfg = SlaConfig.objects.get_solo()
+        org = create_org("CKL")
+        cfg = SlaConfig.objects.get(organization=org)
         cfg.scheduler_interval_minutes = 1
         cfg.scheduler_enabled = True
         cfg.save()
@@ -364,3 +367,32 @@ class CheckSlaLoopTests(TestCase):
         out = StringIO()
         call_command("check_sla", stdout=out)
         self.assertEqual(out.getvalue().count("SLA check:"), 1)
+
+
+class PerOrgSlaTests(TestCase):
+    def setUp(self):
+        from tenancy.testing import create_org
+        self.a = create_org("SLA1")
+        self.b = create_org("SLB2")
+
+    def test_config_por_org_independiente(self):
+        ca = SlaConfig.objects.get(organization=self.a)
+        cb = SlaConfig.objects.get(organization=self.b)
+        ca.work_start = time(7, 0); ca.save()
+        cb.refresh_from_db()
+        self.assertEqual(cb.work_start, time(9, 0))
+
+    def test_calendarios_distintos_producen_deadlines_distintos(self):
+        from sla.calendar_engine import get_calendar, add_business_time
+        ca = SlaConfig.objects.get(organization=self.a)
+        ca.work_end = time(20, 0); ca.save()
+        start = datetime(2026, 1, 5, 17, 0, tzinfo=MX)  # lunes 17:00
+        due_a = add_business_time(start, 120, get_calendar(self.a))  # hasta 20h: mismo dia
+        due_b = add_business_time(start, 120, get_calendar(self.b))  # hasta 18h: cruza al martes
+        self.assertNotEqual(due_a, due_b)
+
+    def test_provisioning_al_crear_org(self):
+        from tenancy.models import Organization
+        org = Organization.objects.create(name="Nueva", slug="NEW")
+        self.assertTrue(SlaConfig.objects.filter(organization=org).exists())
+        self.assertEqual(SlaPolicy.objects.filter(organization=org).count(), 4)

@@ -12,10 +12,11 @@ class ConfigView(APIView):
     permission_classes = [IsAdminRole]
 
     def get(self, request):
-        return Response(SlaConfigSerializer(SlaConfig.objects.get_solo()).data)
+        cfg = SlaConfig.objects.get(organization=request.organization)
+        return Response(SlaConfigSerializer(cfg).data)
 
     def patch(self, request):
-        cfg = SlaConfig.objects.get_solo()
+        cfg = SlaConfig.objects.get(organization=request.organization)
         ser = SlaConfigSerializer(cfg, data=request.data, partial=True)
         ser.is_valid(raise_exception=True)
         ser.save()
@@ -26,22 +27,30 @@ class PoliciesView(APIView):
     permission_classes = [IsAdminRole]
 
     def get(self, request):
-        return Response(SlaPolicySerializer(SlaPolicy.objects.all().order_by("priority"), many=True).data)
+        qs = SlaPolicy.objects.filter(organization=request.organization).order_by("priority")
+        return Response(SlaPolicySerializer(qs, many=True).data)
 
     def patch(self, request):
         # request.data es una lista de {priority, first_response_minutes, resolution_minutes}
         for row in request.data:
-            obj = SlaPolicy.objects.filter(priority=row.get("priority")).first()
+            obj = SlaPolicy.objects.filter(
+                organization=request.organization, priority=row.get("priority")).first()
             if obj is None:
                 continue
             ser = SlaPolicySerializer(obj, data=row, partial=True)
             ser.is_valid(raise_exception=True)
             ser.save()
-        return Response(SlaPolicySerializer(SlaPolicy.objects.all().order_by("priority"), many=True).data)
+        qs = SlaPolicy.objects.filter(organization=request.organization).order_by("priority")
+        return Response(SlaPolicySerializer(qs, many=True).data)
 
 
 class HolidayViewSet(mixins.ListModelMixin, mixins.CreateModelMixin,
                      mixins.DestroyModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAdminRole]
-    queryset = Holiday.objects.all()
     serializer_class = HolidaySerializer
+
+    def get_queryset(self):
+        return Holiday.objects.filter(organization=self.request.organization)
+
+    def perform_create(self, serializer):
+        serializer.save(organization=self.request.organization)

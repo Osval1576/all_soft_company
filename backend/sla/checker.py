@@ -14,14 +14,21 @@ _CLOCK_LABEL = {"fr": "primera respuesta", "res": "resolución"}
 def run_sla_check():
     from .models import TicketSla
 
-    cal = get_calendar()
     now = timezone.now()
     result = {"checked": 0, "notified": 0}
+    calendars = {}  # org_id -> Calendar (cache, un query de config/holidays por org)
 
-    qs = TicketSla.objects.select_related("ticket").filter(
+    qs = TicketSla.objects.select_related("ticket", "ticket__organization").filter(
         ticket__estado__in=["OPEN", "IN_PROGRESS"]
     )
     for ts in qs:
+        org = ts.ticket.organization
+        if org is None or not org.is_active:
+            continue
+        if org.id not in calendars:
+            calendars[org.id] = get_calendar(org)
+        cal = calendars[org.id]
+
         result["checked"] += 1
         levels = compute_levels(ts, now, cal)
         for clock, field in (("fr", "fr_level"), ("res", "res_level")):

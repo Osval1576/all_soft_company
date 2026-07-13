@@ -18,12 +18,15 @@ MX = ZoneInfo("America/Mexico_City")
 User = get_user_model()
 
 
-def _seed_sla():
-    SlaConfig.objects.get_solo()
+def _seed_sla(org):
+    # create_org() ya provisiona SlaConfig/SlaPolicy per-org (via signal +
+    # refuerzo idempotente); esto queda como no-op defensivo por si algun
+    # test necesita forzar la creacion antes de crear el ticket.
+    SlaConfig.objects.get_or_create(organization=org)
     for prio, fr, res in [("URGENT", 30, 240), ("HIGH", 60, 480),
                           ("MEDIUM", 120, 960), ("LOW", 240, 1920)]:
         SlaPolicy.objects.get_or_create(
-            priority=prio,
+            organization=org, priority=prio,
             defaults={"first_response_minutes": fr, "resolution_minutes": res},
         )
 
@@ -32,8 +35,8 @@ class MetricsFactoryMixin:
     _n = 0
 
     def setUp(self):
-        _seed_sla()
         self.org = create_org("MET")
+        _seed_sla(self.org)
         self.customer = User.objects.create_user("cust", role="CUSTOMER", organization=self.org)
         self.tech = User.objects.create_user("tech", role="AGENT", organization=self.org)
 
@@ -134,7 +137,7 @@ class ComplianceTests(MetricsFactoryMixin, TestCase):
 
 class AvgTimesTests(MetricsFactoryMixin, TestCase):
     def test_resolution_avg_business_minutes(self):
-        cal = get_calendar()
+        cal = get_calendar(self.org)
         # Lun 2026-01-05 10:00 MX -> mismo día 12:30 MX = 150 min laborales
         created = datetime(2026, 1, 5, 10, 0, tzinfo=MX)
         t = self.make_ticket(estado="RESOLVED", created=created)
@@ -145,7 +148,7 @@ class AvgTimesTests(MetricsFactoryMixin, TestCase):
         self.assertEqual(out["resolution_min"], 150)
 
     def test_first_response_avg_and_empty(self):
-        cal = get_calendar()
+        cal = get_calendar(self.org)
         created = datetime(2026, 1, 5, 10, 0, tzinfo=MX)
         t = self.make_ticket(created=created)
         ts = t.sla
@@ -156,7 +159,7 @@ class AvgTimesTests(MetricsFactoryMixin, TestCase):
         self.assertIsNone(out["resolution_min"])
 
     def test_resolution_avg_crosses_weekend(self):
-        cal = get_calendar()
+        cal = get_calendar(self.org)
         # Viernes 2026-01-09 17:00 MX -> Lunes 2026-01-12 10:00 MX.
         # Laboral: vie 17:00-18:00 (60) + lun 09:00-10:00 (60) = 120 min.
         # Un bug wall-clock daría ~3900 min (65 h), así que este caso lo detecta.
@@ -192,7 +195,7 @@ class TrendTests(MetricsFactoryMixin, TestCase):
 
 class RankingTests(MetricsFactoryMixin, TestCase):
     def test_ranking_groups_by_technician_and_sorts(self):
-        cal = get_calendar()
+        cal = get_calendar(self.org)
         base = timezone.now()
         tech2 = User.objects.create_user("tech2", role="AGENT", first_name="Ana", last_name="Paz", organization=self.org)
         # tech: 1 resuelto a tiempo (sla_pct=1.0)
@@ -213,7 +216,7 @@ class RankingTests(MetricsFactoryMixin, TestCase):
         self.assertEqual(rows[1]["name"], "Ana Paz")
 
     def test_ranking_sorts_none_last_and_covers_optional_fields(self):
-        cal = get_calendar()
+        cal = get_calendar(self.org)
         base = timezone.now()
         # técnico con un resuelto a tiempo -> sla_pct 1.0, con CSAT y tiempo de resolución
         t1 = self.make_ticket(estado="RESOLVED", asignado=self.tech)
