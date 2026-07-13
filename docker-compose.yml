@@ -1,0 +1,75 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-allsafe}
+      MYSQL_USER: ${DB_USER:-allsafe}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?definir en .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?definir en .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  web:
+    build: ./backend
+    env_file: .env
+    environment:
+      DB_HOST: mysql
+      REDIS_URL: redis://redis:6379/0
+      SLA_SCHEDULER_MODE: "off"
+      COLLECT_STATIC: "true"
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  scheduler:
+    build: ./backend
+    command: python manage.py check_sla --loop
+    env_file: .env
+    environment:
+      DB_HOST: mysql
+      REDIS_URL: redis://redis:6379/0
+      RUN_MIGRATIONS: "false"
+    depends_on:
+      web:
+        condition: service_healthy
+
+  nginx:
+    build: ./frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - static_volume:/staticfiles:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  static_volume:
+  media_volume:

@@ -12,8 +12,10 @@ class SlaAppConfig(AppConfig):
     def ready(self):
         from . import signals  # noqa: F401
         import os
-        # Sólo en el proceso principal (evita duplicado con el autoreloader de runserver).
-        if os.environ.get("RUN_MAIN") == "true":
+        # Thread in-process sólo en dev (runserver): en prod el scheduler es un
+        # servicio dedicado (manage.py check_sla --loop) y aquí va MODE=off.
+        mode = os.environ.get("SLA_SCHEDULER_MODE", "thread")
+        if mode == "thread" and os.environ.get("RUN_MAIN") == "true":
             try:
                 from .scheduler import start_scheduler
                 start_scheduler()

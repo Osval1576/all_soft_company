@@ -1,5 +1,5 @@
-from datetime import datetime
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 from .models import Ticket
 from .models import TicketMessage
@@ -151,7 +151,7 @@ class TicketCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         request = self.context["request"]
 
-        prefix = "ALS-" + datetime.utcnow().strftime("%Y%m%d") + "-"
+        prefix = "ALS-" + timezone.localdate().strftime("%Y%m%d") + "-"
         last = (
             Ticket.objects.select_for_update()
             .filter(reference__startswith=prefix)

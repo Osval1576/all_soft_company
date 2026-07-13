@@ -184,7 +184,7 @@ const submittingUser = ref(false);
 const userFormError = ref("");
 const uForm = ref({ username: "", password: "", first_name: "", last_name: "", email: "", role: "CUSTOMER" });
 
-const agents = computed(() => users.value.filter(u => u.role === "AGENT" || u.is_staff));
+const agents = computed(() => users.value.filter(u => u.role === "AGENT"));
 
 const searchedTickets = computed(() => {
   const q = ticketSearch.value.toLowerCase();

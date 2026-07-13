@@ -325,3 +325,29 @@ class AdminApiTests(TestCase):
         hid = r.json()["id"]
         self.assertEqual(c.get("/api/admin/sla/holidays/").status_code, 200)
         self.assertEqual(c.delete(f"/api/admin/sla/holidays/{hid}/").status_code, 204)
+
+
+from io import StringIO
+from unittest import mock
+
+from django.core.management import call_command
+
+
+class CheckSlaLoopTests(TestCase):
+    def setUp(self):
+        cfg = SlaConfig.objects.get_solo()
+        cfg.scheduler_interval_minutes = 1
+        cfg.scheduler_enabled = True
+        cfg.save()
+
+    @mock.patch("sla.management.commands.check_sla.time.sleep")
+    def test_loop_corre_max_loops_pasadas_y_duerme_el_intervalo(self, sleep_mock):
+        out = StringIO()
+        call_command("check_sla", "--loop", "--max-loops=2", stdout=out)
+        self.assertEqual(out.getvalue().count("SLA check:"), 2)
+        sleep_mock.assert_called_once_with(60)  # 1 min entre pasada 1 y 2; tras la última no duerme
+
+    def test_sin_loop_una_pasada(self):
+        out = StringIO()
+        call_command("check_sla", stdout=out)
+        self.assertEqual(out.getvalue().count("SLA check:"), 1)

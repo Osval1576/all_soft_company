@@ -60,11 +60,10 @@ router.beforeEach(async (to) => {
   if (!auth.user) return { name: "login" };
 
   const required = to.meta?.role;
-  if (required === "ADMIN" && !auth.user.is_superuser) return auth.redirectByRole();
-  if (required === "AGENT" && !auth.user.is_staff) return auth.redirectByRole();
-  if (required === "CUSTOMER" && (auth.user.is_staff || auth.user.is_superuser)) {
-    return auth.redirectByRole();
-  }
+  const role = auth.user?.role;
+  if (required === "ADMIN" && role !== "ADMIN") return auth.redirectByRole();
+  if (required === "AGENT" && role !== "AGENT") return auth.redirectByRole();
+  if (required === "CUSTOMER" && role !== "CUSTOMER") return auth.redirectByRole();
   return true;
 });
 

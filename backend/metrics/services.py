@@ -2,7 +2,6 @@
 from datetime import timedelta
 
 from django.db.models import Avg, Count, F, Q
-from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 
@@ -72,14 +71,23 @@ def compliance(qs):
 
 
 def trend(qs, window):
+    # Bucketeo en Python con timezone.localdate(): TruncDate con TIME_ZONE
+    # no-UTC genera CONVERT_TZ, que devuelve NULL silencioso si el MySQL no
+    # tiene cargadas las timezone tables (caso default de la imagen Docker).
+    # La cohorte ya viene acotada por la ventana (<=90 dias).
     today = timezone.localdate()
     start = today - timedelta(days=window)
     end = today
-    created_map = {r["d"]: r["n"] for r in
-                   qs.annotate(d=TruncDate("created_at")).values("d").annotate(n=Count("id"))}
-    resolved_map = {r["d"]: r["n"] for r in
-                    qs.filter(sla__resolved_at__isnull=False)
-                      .annotate(d=TruncDate("sla__resolved_at")).values("d").annotate(n=Count("id"))}
+    created_map = {}
+    for dt in qs.values_list("created_at", flat=True):
+        d = timezone.localdate(dt)
+        if start <= d <= end:
+            created_map[d] = created_map.get(d, 0) + 1
+    resolved_map = {}
+    for dt in qs.filter(sla__resolved_at__isnull=False).values_list("sla__resolved_at", flat=True):
+        d = timezone.localdate(dt)
+        if start <= d <= end:
+            resolved_map[d] = resolved_map.get(d, 0) + 1
     series, d = [], start
     while d <= end:
         series.append({"date": d.isoformat(),

@@ -21,8 +21,8 @@ export const useAuthStore = defineStore("auth", {
 },
 
 redirectByRole() {
-  if (this.user?.is_superuser) return { name: "admin" };
-  if (this.user?.is_staff) return { name: "tecnico-inbox" };
+  if (this.user?.role === "ADMIN") return { name: "admin" };
+  if (this.user?.role === "AGENT") return { name: "tecnico-inbox" };
   return { name: "cliente" };
 },
 

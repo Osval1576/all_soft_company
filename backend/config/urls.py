@@ -19,19 +19,20 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import me
+from .views import me, health
 from .auth_views import LoginCookieView, RefreshCookieView, LogoutView
 from landing_cms.admin_views import SiteSettingsAdminView
 
 v_settings_admin = SiteSettingsAdminView.as_view()
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path("django-admin/", admin.site.urls),
 
     path("api/auth/login/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
     path("api/me/", me, name="me"),
+    path("api/health/", health, name="health"),
 
     path("api/users/", include("users.urls")),
     path("api/public/", include("landing_cms.public_urls")),
