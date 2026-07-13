@@ -23,8 +23,10 @@ class IsCustomer(BasePermission):
 def can_access_ticket(user, ticket):
     if not user or not getattr(user, "is_authenticated", False):
         return False
+    if getattr(user, "organization_id", None) != ticket.organization_id:
+        return False
     r = getattr(user, "role", None)
-    if r == "ADMIN" or user.is_superuser:
+    if r == "ADMIN":
         return True
     if r == "CUSTOMER":
         return ticket.creado_por_id == user.id

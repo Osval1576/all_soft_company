@@ -27,3 +27,9 @@ def org_agents(org):
 
 def org_admins(org):
     return org_users(org).filter(role="ADMIN")
+
+
+def org_tickets(org):
+    from tickets_t.models import Ticket
+    qs = Ticket.objects.select_related("sla", "csat")
+    return qs.filter(organization=org) if org is not None else qs.none()

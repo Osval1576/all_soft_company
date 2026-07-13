@@ -386,3 +386,42 @@ class DownloadAttachmentTests(TestCase):
     def test_download_404_for_missing_message(self):
         r = self._client(self.customer).get(self._url(mid=999999))
         self.assertEqual(r.status_code, 404)
+
+
+class TenantScopingTests(TestCase):
+    def setUp(self):
+        from tenancy.testing import create_org
+        self.org_a = create_org("TSA")
+        self.org_b = create_org("TSB")
+        self.cust_a = User.objects.create_user("tsc_a", role="CUSTOMER", organization=self.org_a)
+        self.admin_a = User.objects.create_user("tsa_a", role="ADMIN", organization=self.org_a)
+        self.agent_b = User.objects.create_user("tsg_b", role="AGENT", organization=self.org_b)
+        self.t_b = Ticket.objects.create(reference="TSB-X-1", titulo="b", descripcion="d",
+                                         creado_por=User.objects.create_user(
+                                             "tscust_b", role="CUSTOMER", organization=self.org_b),
+                                         organization=self.org_b)
+        self.client_api = APIClient()
+
+    def test_admin_no_ve_tickets_de_otra_org(self):
+        self.client_api.force_authenticate(self.admin_a)
+        r = self.client_api.get(f"/api/tickets_t/{self.t_b.id}/")
+        self.assertEqual(r.status_code, 404)
+
+    def test_referencia_usa_slug_de_la_org(self):
+        self.client_api.force_authenticate(self.cust_a)
+        r = self.client_api.post("/api/tickets_t/", {"titulo": "t", "descripcion": "d",
+                                                     "prioridad": "MEDIUM"})
+        self.assertEqual(r.status_code, 201)
+        self.assertTrue(r.json()["reference"].startswith("TSA-"))
+
+    def test_asignar_tecnico_de_otra_org_falla(self):
+        t = Ticket.objects.create(reference="TSA-X-1", titulo="a", descripcion="d",
+                                  creado_por=self.cust_a, organization=self.org_a)
+        self.client_api.force_authenticate(self.admin_a)
+        r = self.client_api.patch(f"/api/tickets_t/{t.id}/", {"asignado_a": self.agent_b.id})
+        self.assertEqual(r.status_code, 400)
+
+    def test_can_access_niega_cross_org_y_superuser_sin_org(self):
+        self.assertFalse(can_access_ticket(self.admin_a, self.t_b))
+        plat = User.objects.create_user("plat_su", is_superuser=True)
+        self.assertFalse(can_access_ticket(plat, self.t_b))

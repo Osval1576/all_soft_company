@@ -86,6 +86,10 @@ class TicketSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Solo se puede asignar a técnicos (rol AGENT)."
             )
+        request = self.context.get("request")
+        org = getattr(request, "organization", None) if request else None
+        if org is None or value.organization_id != org.id:
+            raise serializers.ValidationError("El técnico debe pertenecer a tu organización.")
         return value
 
     def validate_estado(self, value):
@@ -155,8 +159,9 @@ class TicketCreateSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         request = self.context["request"]
+        org = request.user.organization
 
-        prefix = "ALS-" + timezone.localdate().strftime("%Y%m%d") + "-"
+        prefix = f"{org.slug}-" + timezone.localdate().strftime("%Y%m%d") + "-"
         last = (
             Ticket.objects.select_for_update()
             .filter(reference__startswith=prefix)
@@ -167,6 +172,7 @@ class TicketCreateSerializer(serializers.ModelSerializer):
 
         validated_data["reference"] = f"{prefix}{next_num:06d}"
         validated_data["creado_por"] = request.user
+        validated_data["organization"] = org
         return super().create(validated_data)
     
 
