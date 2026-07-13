@@ -160,6 +160,11 @@ class TicketCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         request = self.context["request"]
         org = request.user.organization
+        if org is None:
+            # fail-closed: el staff de plataforma (superuser sin org) no opera
+            # tickets por la API in-app — mismo criterio que el resto del modulo
+            raise serializers.ValidationError(
+                {"detail": "Tu cuenta no pertenece a ninguna organización."})
 
         prefix = f"{org.slug}-" + timezone.localdate().strftime("%Y%m%d") + "-"
         last = (

@@ -425,3 +425,10 @@ class TenantScopingTests(TestCase):
         self.assertFalse(can_access_ticket(self.admin_a, self.t_b))
         plat = User.objects.create_user("plat_su", is_superuser=True)
         self.assertFalse(can_access_ticket(plat, self.t_b))
+
+    def test_superuser_sin_org_no_puede_crear_ticket(self):
+        plat = User.objects.create_user("plat_su2", is_superuser=True)
+        self.client_api.force_authenticate(plat)
+        r = self.client_api.post("/api/tickets_t/", {"titulo": "t", "descripcion": "d",
+                                                     "prioridad": "MEDIUM"})
+        self.assertEqual(r.status_code, 400)  # fail-closed, nunca 500
