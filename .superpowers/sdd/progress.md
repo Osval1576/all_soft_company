@@ -229,3 +229,20 @@ Task 10: complete (commit c8ef5006..7a4ad589, review clean; build limpio, SIN is
 - T8/T10: TrendLine sin empty-state; apexTheme no re-tematiza en toggle light/dark con vista abierta (follow-up).
 
 Barrido de follow-ups (rama chore/follow-ups-sweep, 2026-07-11/12): 16 commits (A1-A7 backend + B1-B11 frontend). Review de rama: Approved, 18/18 items, 0 Critical/Important. Gate: suite completa fresca 150/150 OK (147 + 3 tests nuevos del barrido). Verificacion browser: B9 re-theme confirmado en vivo (strokes cambian con data-theme, 4 charts sobreviven el remount); F3 dashboards PASS pre-barrido. Backend implementer murio sin reporte -> controller verifico commits + corrio suite. Nota: HMR de Vite corrompe la sesion del browser si se edita con el dev server vivo -> reiniciar server tras sweeps grandes.
+
+
+---
+# G · Endurecimiento Produccion (rama feat/produccion-g, iniciada 2026-07-12)
+Plan: docs/superpowers/plans/2026-07-12-produccion-g.md
+Base de rama: 5624b565
+G-T1: complete (commits 5624b565..88e04c8b + fix 8c8675f6, users 3/3 + sla 29/29 + tickets_t 31/31 + metrics 21/21). Desvio aceptado: @register(deploy=True) (el check plano rompia manage.py test) -> T7 entrypoint DEBE correr check --deploy. Fix real encontrado por el switch de TZ: TruncDate+CONVERT_TZ devuelve NULL sin tz-tables de MySQL (tambien en la imagen Docker!) -> trend bucketea en Python con localdate.
+G-T1: review clean (Approved). Minors cross-task: T4 checks nuevos deben seguir convencion deploy=True; T7 entrypoint DEBE invocar check --deploy o el guard nunca corre. trend() Python-loop OK a esta escala.
+G-T2: complete (commit e7b829a4, review Approved; check limpio + notifications 23/23). Pins reales: channels-redis 4.3.0, django-redis 7.0.0 (compat verificada contra el source instalado). Minors para T7: pinnear redis transitivo (8.0.1); runbook debe incluir smoke de 4 puntos del branch Redis (check con REDIS_URL, cache round-trip, WS cross-worker, Redis caido -> 5xx ruidoso).
+G-T3: complete (commit 69053e01, review Approved; sla 31/31). Implementer murio sin commitear -> controller verifico diff verbatim + corrio suite + commiteo. Loop semantics hand-traced OK (max-loops sin sleep final, KeyboardInterrupt limpio, excepcion no mata loop, get_solo caido -> fallback 10min).
+G-T4: complete (commit 88f2a5ff, review Approved sin issues; users+tickets_t 36/36). SECURE_REDIRECT_EXEMPT regex verificado contra el source del middleware (path sin slash inicial); dev neutral comprobado setting por setting; sin referencias colgadas a /admin/ viejo.
+G-T5: complete (commits d23340f1 + fix 2cdc0347, review Approved; users 5/5, migrate dev OK, build limpio). Backfill verificado en 4 casos (super->ADMIN, staff->AGENT, correctos intactos, idempotente). Fix wave: 4 sitios residuales de flags migrados a role (dashboardRoute, NotificationSettings, AppTopBar, filtro de agentes de AdminDashboard que podia listar ADMINs como asignables). Unico is_staff restante = payload de creacion de usuario (escritura, no gating).
+G-T6: complete (commit 4ec791f8; build limpio). Diff de 12 lineas verificado directo por el controller (?? no ||, doc en .env.example) - reviewer omitido por escala, lo cubre el review final de rama.
+G-T7: complete (commits b338965c + fix 8fb91ae9, review opus Approved; YAML valido, env contract cerrado, cadena compose-settings-nginx-asgi hand-traced sin defectos de boot). 3 enmiendas cross-task aplicadas (check --deploy en entrypoint, redis pinneado, smoke Redis 4 puntos). Fix wave: smoke Redis-down real (cache.set + WS, no /api/health/), mysql healthcheck CMD-SHELL, .dockerignore, .gitattributes eol, TLS sin vhost 80 residual, caveat de scale.
+
+## G: 7/7 tasks completas. Pendiente: review final de rama + gate DB fresca + merge.
+Review final de rama G (opus): READY TO MERGE, sin blockers. 2 minors arreglados inline (utcnow->localdate en prefijo de referencia, frontend/.dockerignore). Follow-up documentado: is_staff en payload de creacion de usuario (AdminDashboard:239 + UserCreateSerializer) - un ADMIN creado por el form no accede a /django-admin/ (probablemente intencional, django-admin via createsuperuser).
