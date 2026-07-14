@@ -25,12 +25,12 @@ class Calendar:
                                 second=0, microsecond=0)
 
 
-def get_calendar():
+def get_calendar(org):
     from .models import SlaConfig, Holiday
-    cfg = SlaConfig.objects.get_solo()
+    cfg = SlaConfig.objects.get(organization=org)
     tz = ZoneInfo(cfg.business_timezone)
     work_days = {int(x) for x in cfg.work_days.split(",") if x.strip()}
-    holidays = set(Holiday.objects.values_list("date", flat=True))
+    holidays = set(Holiday.objects.filter(organization=org).values_list("date", flat=True))
     return Calendar(tz, work_days, cfg.work_start, cfg.work_end, holidays,
                     cfg.at_risk_threshold_pct)
 

@@ -1,6 +1,7 @@
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.core import mail
+from tenancy.testing import create_org
 from tickets_t.models import Ticket
 from notifications.models import Notification, NotificationPreference
 from notifications.presence import mark_online, is_online, mark_offline
@@ -16,10 +17,12 @@ User = get_user_model()
 
 class ModelTests(TestCase):
     def setUp(self):
-        self.customer = User.objects.create_user(username="c", password="x", role="CUSTOMER", email="c@x.com")
+        self.org = create_org("NOT")
+        self.customer = User.objects.create_user(username="c", password="x", role="CUSTOMER", email="c@x.com", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-000001", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="OPEN", creado_por=self.customer,
+            organization=self.org,
         )
 
     def test_notification_created(self):
@@ -55,14 +58,16 @@ class PresenceTests(TestCase):
 
 class EmailHelperTests(TestCase):
     def test_sends_when_recipient_has_email(self):
-        u = User.objects.create_user(username="e1", password="x", role="CUSTOMER", email="e1@x.com")
+        u = User.objects.create_user(username="e1", password="x", role="CUSTOMER", email="e1@x.com",
+                                     organization=create_org("NOT"))
         send_notification_email(u, "Asunto", "Cuerpo del mail")
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].subject, "Asunto")
         self.assertEqual(mail.outbox[0].to, ["e1@x.com"])
 
     def test_noop_without_email(self):
-        u = User.objects.create_user(username="e2", password="x", role="CUSTOMER", email="")
+        u = User.objects.create_user(username="e2", password="x", role="CUSTOMER", email="",
+                                     organization=create_org("NOT"))
         send_notification_email(u, "Asunto", "Cuerpo")
         self.assertEqual(len(mail.outbox), 0)
 
@@ -70,13 +75,15 @@ class EmailHelperTests(TestCase):
 @override_settings(NOTIFICATIONS_EMAIL_ASYNC=False)
 class DispatchTests(TestCase):
     def setUp(self):
-        self.admin = User.objects.create_user(username="adm", password="x", role="ADMIN", email="adm@x.com")
-        self.agent = User.objects.create_user(username="ag", password="x", role="AGENT", email="ag@x.com")
-        self.customer = User.objects.create_user(username="cu", password="x", role="CUSTOMER", email="cu@x.com")
+        self.org = create_org("NOT")
+        self.admin = User.objects.create_user(username="adm", password="x", role="ADMIN", email="adm@x.com", organization=self.org)
+        self.agent = User.objects.create_user(username="ag", password="x", role="AGENT", email="ag@x.com", organization=self.org)
+        self.customer = User.objects.create_user(username="cu", password="x", role="CUSTOMER", email="cu@x.com", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-000100", titulo="Impresora rota", descripcion="d",
             prioridad="MEDIUM", estado="RESOLVED",
             creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org,
         )
 
     def test_status_changed_notifies_customer_with_email(self):
@@ -117,6 +124,7 @@ class DispatchTests(TestCase):
         new_ticket = Ticket.objects.create(
             reference="ALS-20260101-000101", titulo="Nuevo", descripcion="d",
             prioridad="MEDIUM", estado="OPEN", creado_por=self.customer,
+            organization=self.org,
         )
         dispatch("ticket_created", new_ticket, actor=self.customer)
         self.assertEqual(Notification.objects.filter(recipient=self.admin, kind="ticket_created").count(), 1)
@@ -130,11 +138,13 @@ from rest_framework.test import APIClient
 
 class ApiTests(TestCase):
     def setUp(self):
-        self.customer = User.objects.create_user(username="apic", password="x", role="CUSTOMER", email="apic@x.com")
-        self.other = User.objects.create_user(username="apio", password="x", role="CUSTOMER", email="o@x.com")
+        self.org = create_org("NOT")
+        self.customer = User.objects.create_user(username="apic", password="x", role="CUSTOMER", email="apic@x.com", organization=self.org)
+        self.other = User.objects.create_user(username="apio", password="x", role="CUSTOMER", email="o@x.com", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-000200", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="OPEN", creado_por=self.customer,
+            organization=self.org,
         )
         self.n1 = Notification.objects.create(recipient=self.customer, kind="status_changed", ticket=self.ticket, title="A")
         self.n2 = Notification.objects.create(recipient=self.customer, kind="status_changed", ticket=self.ticket, title="B")
@@ -187,8 +197,9 @@ class NotifyConsumerTests(TransactionTestCase):
         self.assertFalse(connected)
 
     async def test_authed_connects_and_marks_online(self):
+        org = await database_sync_to_async(create_org)("NOT")
         user = await database_sync_to_async(User.objects.create_user)(
-            username="wsu", password="x", role="CUSTOMER"
+            username="wsu", password="x", role="CUSTOMER", organization=org
         )
         token = str(AccessToken.for_user(user))
         communicator = WebsocketCommunicator(application, "/ws/notify/")
@@ -208,12 +219,14 @@ class IntegrationTests(TransactionTestCase):
     # lo cual corrompe el savepoint del bloque atomic de TestCase en MySQL (mismo problema
     # documentado en NotifyConsumerTests, Task 5).
     def setUp(self):
-        self.agent = User.objects.create_user(username="iag", password="x", role="AGENT", email="iag@x.com")
-        self.customer = User.objects.create_user(username="icu", password="x", role="CUSTOMER", email="icu@x.com")
+        self.org = create_org("NOT")
+        self.agent = User.objects.create_user(username="iag", password="x", role="AGENT", email="iag@x.com", organization=self.org)
+        self.customer = User.objects.create_user(username="icu", password="x", role="CUSTOMER", email="icu@x.com", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-000300", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="IN_PROGRESS",
             creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org,
         )
 
     def _client(self, user):
@@ -245,12 +258,14 @@ class IntegrationTests(TransactionTestCase):
 @override_settings(NOTIFICATIONS_EMAIL_ASYNC=False)
 class SlaNotificationTests(TestCase):
     def setUp(self):
-        self.admin = User.objects.create_user(username="sn_adm", password="x", role="ADMIN", email="adm@x.com")
-        self.agent = User.objects.create_user(username="sn_ag", password="x", role="AGENT", email="ag@x.com")
-        self.customer = User.objects.create_user(username="sn_cu", password="x", role="CUSTOMER")
+        self.org = create_org("NOT")
+        self.admin = User.objects.create_user(username="sn_adm", password="x", role="ADMIN", email="adm@x.com", organization=self.org)
+        self.agent = User.objects.create_user(username="sn_ag", password="x", role="AGENT", email="ag@x.com", organization=self.org)
+        self.customer = User.objects.create_user(username="sn_cu", password="x", role="CUSTOMER", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-000700", titulo="T", descripcion="d",
             prioridad="HIGH", estado="OPEN", creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org,
         )
 
     def test_sla_breached_notifies_agent_and_admins_in_app_only(self):
@@ -267,3 +282,19 @@ class SlaNotificationTests(TestCase):
         from notifications.models import Notification
         dispatch("sla_at_risk", self.ticket, actor=None, extra={"clock": "primera respuesta"})
         self.assertEqual(Notification.objects.filter(kind="sla_at_risk").count(), 2)  # agent + admin
+
+
+class TenantNotificationTests(TestCase):
+    def test_ticket_created_no_notifica_admins_de_otra_org(self):
+        from tenancy.testing import create_org
+        a, b = create_org("NTA"), create_org("NTB")
+        admin_a = User.objects.create_user("nta_adm", role="ADMIN", organization=a)
+        admin_b = User.objects.create_user("ntb_adm", role="ADMIN", organization=b)
+        cust_a = User.objects.create_user("nta_cus", role="CUSTOMER", organization=a)
+        t = Ticket.objects.create(reference="NTA-1", titulo="x", descripcion="d",
+                                  creado_por=cust_a, organization=a)
+        dispatch("ticket_created", t)
+        recipients = set(Notification.objects.filter(kind="ticket_created")
+                         .values_list("recipient_id", flat=True))
+        self.assertIn(admin_a.id, recipients)
+        self.assertNotIn(admin_b.id, recipients)

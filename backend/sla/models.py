@@ -1,18 +1,10 @@
 from django.db import models
 
 
-class SingletonManager(models.Manager):
-    def get_solo(self):
-        obj, created = self.get_or_create(pk=1)
-        if created:
-            # Tras el create, releer de la DB: los defaults "crudos" (p.ej. TimeField
-            # default="09:00") quedan como str en la instancia en memoria en vez de
-            # castearse a datetime.time, lo que rompe Calendar._start_of/_end_of.
-            obj.refresh_from_db()
-        return obj
-
-
 class SlaConfig(models.Model):
+    organization = models.OneToOneField(
+        "tenancy.Organization", on_delete=models.CASCADE, related_name="sla_config",
+    )
     business_timezone = models.CharField(max_length=64, default="America/Mexico_City")
     work_days = models.CharField(max_length=20, default="1,2,3,4,5")  # ISO weekday 1=Lun..7=Dom
     work_start = models.TimeField(default="09:00")
@@ -21,28 +13,38 @@ class SlaConfig(models.Model):
     scheduler_interval_minutes = models.PositiveIntegerField(default=10)
     scheduler_enabled = models.BooleanField(default=True)
 
-    objects = SingletonManager()
-
-    def save(self, *args, **kwargs):
-        self.pk = 1
-        super().save(*args, **kwargs)
-
 
 class SlaPolicy(models.Model):
-    priority = models.CharField(max_length=20, unique=True)  # Ticket.Priority values
+    organization = models.ForeignKey(
+        "tenancy.Organization", on_delete=models.CASCADE,
+    )
+    priority = models.CharField(max_length=20)  # Ticket.Priority values
     first_response_minutes = models.PositiveIntegerField()
     resolution_minutes = models.PositiveIntegerField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["organization", "priority"],
+                                    name="uniq_policy_org_priority"),
+        ]
 
     def __str__(self):
         return f"{self.priority}: {self.first_response_minutes}/{self.resolution_minutes}"
 
 
 class Holiday(models.Model):
-    date = models.DateField(unique=True)
+    organization = models.ForeignKey(
+        "tenancy.Organization", on_delete=models.CASCADE,
+    )
+    date = models.DateField()
     name = models.CharField(max_length=120, blank=True)
 
     class Meta:
         ordering = ["date"]
+        constraints = [
+            models.UniqueConstraint(fields=["organization", "date"],
+                                    name="uniq_holiday_org_date"),
+        ]
 
     def __str__(self):
         return f"{self.date} {self.name}"

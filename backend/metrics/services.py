@@ -13,12 +13,10 @@ def _parse_window(request):
     return w if w in (7, 30, 90) else 30
 
 
-def windowed_tickets(window):
-    from tickets_t.models import Ticket
+def windowed_tickets(window, org):
+    from tenancy.scoping import org_tickets
     cutoff = timezone.now() - timedelta(days=window)
-    return (Ticket.objects
-            .select_related("sla", "csat")
-            .filter(created_at__gte=cutoff))
+    return org_tickets(org).filter(created_at__gte=cutoff)
 
 
 def volume_totals(qs):

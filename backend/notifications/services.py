@@ -5,7 +5,9 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db import models, transaction
+from django.db import transaction
+
+from tenancy.scoping import org_admins, org_agents
 
 from .emails import send_notification_email
 from .models import Notification, NotificationPreference
@@ -21,12 +23,12 @@ STATUS_LABELS = {
 }
 
 
-def _admins():
-    return User.objects.filter(models.Q(is_superuser=True) | models.Q(role="ADMIN"))
+def _admins(org):
+    return org_admins(org)
 
 
-def _agents():
-    return User.objects.filter(role="AGENT")
+def _agents(org):
+    return org_agents(org)
 
 
 def _push(user_id, notification):
@@ -68,7 +70,7 @@ def _recipients_for(kind, ticket, actor, extra):
     specs = []
 
     if kind == "ticket_created":
-        for admin in _admins():
+        for admin in _admins(ticket.organization):
             specs.append({
                 "user": admin,
                 "title": f"Nuevo ticket {ref}",
@@ -79,7 +81,7 @@ def _recipients_for(kind, ticket, actor, extra):
                 "email_body": f"Entró un ticket nuevo: {ref} — {ticket.titulo}.",
                 "offline_only": False,
             })
-        for agent in _agents():
+        for agent in _agents(ticket.organization):
             specs.append({
                 "user": agent, "title": f"Ticket sin asignar: {ref}",
                 "body": ticket.titulo, "email": False, "pref_field": None,
@@ -144,7 +146,7 @@ def _recipients_for(kind, ticket, actor, extra):
         targets = []
         if ticket.asignado_a_id:
             targets.append(ticket.asignado_a)
-        targets.extend(_admins())
+        targets.extend(_admins(ticket.organization))
         seen = set()
         for user in targets:
             if user.id in seen:

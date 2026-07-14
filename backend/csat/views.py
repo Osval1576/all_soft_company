@@ -2,7 +2,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from tickets_t.models import Ticket
+from tenancy.scoping import org_tickets
 
 from .eligibility import is_eligible
 from .models import CSATResponse
@@ -14,7 +14,10 @@ class SubmitCsatView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, ticket_id):
-        ticket = Ticket.objects.filter(pk=ticket_id).first()
+        # Scoped por organizacion (tenancy.scoping.org_tickets): un ticket de
+        # otra org no debe existir para este request -> 404, nunca 403 (eso
+        # revelaria que el ticket existe fuera de la organizacion del actor).
+        ticket = org_tickets(request.organization).filter(pk=ticket_id).first()
         if ticket is None:
             return Response({"detail": "No encontrado."}, status=404)
         if ticket.creado_por_id != request.user.id:

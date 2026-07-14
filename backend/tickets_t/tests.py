@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
+from tenancy.testing import create_org
 from tickets_t.models import Ticket
 from tickets_t.validators import validate_attachment
 
@@ -11,14 +12,16 @@ User = get_user_model()
 
 class StateTransitionTests(TestCase):
     def setUp(self):
-        self.admin = User.objects.create_user(username="adm", password="x", role="ADMIN")
-        self.agent = User.objects.create_user(username="ag", password="x", role="AGENT")
-        self.customer = User.objects.create_user(username="cu", password="x", role="CUSTOMER")
+        self.org = create_org("TKT")
+        self.admin = User.objects.create_user(username="adm", password="x", role="ADMIN", organization=self.org)
+        self.agent = User.objects.create_user(username="ag", password="x", role="AGENT", organization=self.org)
+        self.customer = User.objects.create_user(username="cu", password="x", role="CUSTOMER", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-000001",
             titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="OPEN",
             creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org,
         )
 
     def _client(self, user):
@@ -59,21 +62,24 @@ class StateTransitionTests(TestCase):
 
 class PoolAndTakeTests(TestCase):
     def setUp(self):
-        self.admin = User.objects.create_user(username="adm2", password="x", role="ADMIN")
-        self.agent1 = User.objects.create_user(username="ag1", password="x", role="AGENT")
-        self.agent2 = User.objects.create_user(username="ag2", password="x", role="AGENT")
-        self.customer = User.objects.create_user(username="cu2", password="x", role="CUSTOMER")
+        self.org = create_org("TKT")
+        self.admin = User.objects.create_user(username="adm2", password="x", role="ADMIN", organization=self.org)
+        self.agent1 = User.objects.create_user(username="ag1", password="x", role="AGENT", organization=self.org)
+        self.agent2 = User.objects.create_user(username="ag2", password="x", role="AGENT", organization=self.org)
+        self.customer = User.objects.create_user(username="cu2", password="x", role="CUSTOMER", organization=self.org)
         self.t_unassigned = Ticket.objects.create(
             reference="ALS-20260101-000010",
             titulo="U", descripcion="d",
             prioridad="MEDIUM", estado="OPEN",
             creado_por=self.customer,
+            organization=self.org,
         )
         self.t_assigned = Ticket.objects.create(
             reference="ALS-20260101-000011",
             titulo="A", descripcion="d",
             prioridad="MEDIUM", estado="OPEN",
             creado_por=self.customer, asignado_a=self.agent1,
+            organization=self.org,
         )
 
     def _client(self, u):
@@ -153,10 +159,12 @@ def _png_bytes():
 
 class AttachmentModelTests(TestCase):
     def setUp(self):
-        self.customer = User.objects.create_user(username="atc", password="x", role="CUSTOMER")
+        self.org = create_org("TKT")
+        self.customer = User.objects.create_user(username="atc", password="x", role="CUSTOMER", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-000400", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="OPEN", creado_por=self.customer,
+            organization=self.org,
         )
 
     def test_message_with_attachment_fields(self):
@@ -201,15 +209,17 @@ from tickets_t.serializers import TicketMessageSerializer
 
 class AccessAndPayloadTests(TestCase):
     def setUp(self):
-        self.admin = User.objects.create_user(username="pa_adm", password="x", role="ADMIN")
-        self.agent = User.objects.create_user(username="pa_ag", password="x", role="AGENT")
-        self.other_agent = User.objects.create_user(username="pa_ag2", password="x", role="AGENT")
-        self.customer = User.objects.create_user(username="pa_cu", password="x", role="CUSTOMER")
-        self.other_customer = User.objects.create_user(username="pa_cu2", password="x", role="CUSTOMER")
+        self.org = create_org("TKT")
+        self.admin = User.objects.create_user(username="pa_adm", password="x", role="ADMIN", organization=self.org)
+        self.agent = User.objects.create_user(username="pa_ag", password="x", role="AGENT", organization=self.org)
+        self.other_agent = User.objects.create_user(username="pa_ag2", password="x", role="AGENT", organization=self.org)
+        self.customer = User.objects.create_user(username="pa_cu", password="x", role="CUSTOMER", organization=self.org)
+        self.other_customer = User.objects.create_user(username="pa_cu2", password="x", role="CUSTOMER", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-000410", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="OPEN",
             creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org,
         )
 
     def test_access_matrix(self):
@@ -254,13 +264,15 @@ from django.test import override_settings
 @override_settings(NOTIFICATIONS_EMAIL_ASYNC=False)
 class UploadAttachmentTests(TestCase):
     def setUp(self):
-        self.agent = User.objects.create_user(username="up_ag", password="x", role="AGENT", email="a@x.com")
-        self.customer = User.objects.create_user(username="up_cu", password="x", role="CUSTOMER", email="c@x.com")
-        self.stranger = User.objects.create_user(username="up_x", password="x", role="CUSTOMER")
+        self.org = create_org("TKT")
+        self.agent = User.objects.create_user(username="up_ag", password="x", role="AGENT", email="a@x.com", organization=self.org)
+        self.customer = User.objects.create_user(username="up_cu", password="x", role="CUSTOMER", email="c@x.com", organization=self.org)
+        self.stranger = User.objects.create_user(username="up_x", password="x", role="CUSTOMER", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-000420", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="IN_PROGRESS",
             creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org,
         )
 
     def _client(self, user):
@@ -329,13 +341,15 @@ class UploadAttachmentTests(TestCase):
 
 class DownloadAttachmentTests(TestCase):
     def setUp(self):
-        self.agent = User.objects.create_user(username="dl_ag", password="x", role="AGENT")
-        self.customer = User.objects.create_user(username="dl_cu", password="x", role="CUSTOMER")
-        self.stranger = User.objects.create_user(username="dl_x", password="x", role="CUSTOMER")
+        self.org = create_org("TKT")
+        self.agent = User.objects.create_user(username="dl_ag", password="x", role="AGENT", organization=self.org)
+        self.customer = User.objects.create_user(username="dl_cu", password="x", role="CUSTOMER", organization=self.org)
+        self.stranger = User.objects.create_user(username="dl_x", password="x", role="CUSTOMER", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-000430", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="OPEN",
             creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org,
         )
         from tickets_t.models import TicketMessage
         from django.core.files.uploadedfile import SimpleUploadedFile
@@ -372,3 +386,49 @@ class DownloadAttachmentTests(TestCase):
     def test_download_404_for_missing_message(self):
         r = self._client(self.customer).get(self._url(mid=999999))
         self.assertEqual(r.status_code, 404)
+
+
+class TenantScopingTests(TestCase):
+    def setUp(self):
+        from tenancy.testing import create_org
+        self.org_a = create_org("TSA")
+        self.org_b = create_org("TSB")
+        self.cust_a = User.objects.create_user("tsc_a", role="CUSTOMER", organization=self.org_a)
+        self.admin_a = User.objects.create_user("tsa_a", role="ADMIN", organization=self.org_a)
+        self.agent_b = User.objects.create_user("tsg_b", role="AGENT", organization=self.org_b)
+        self.t_b = Ticket.objects.create(reference="TSB-X-1", titulo="b", descripcion="d",
+                                         creado_por=User.objects.create_user(
+                                             "tscust_b", role="CUSTOMER", organization=self.org_b),
+                                         organization=self.org_b)
+        self.client_api = APIClient()
+
+    def test_admin_no_ve_tickets_de_otra_org(self):
+        self.client_api.force_authenticate(self.admin_a)
+        r = self.client_api.get(f"/api/tickets_t/{self.t_b.id}/")
+        self.assertEqual(r.status_code, 404)
+
+    def test_referencia_usa_slug_de_la_org(self):
+        self.client_api.force_authenticate(self.cust_a)
+        r = self.client_api.post("/api/tickets_t/", {"titulo": "t", "descripcion": "d",
+                                                     "prioridad": "MEDIUM"})
+        self.assertEqual(r.status_code, 201)
+        self.assertTrue(r.json()["reference"].startswith("TSA-"))
+
+    def test_asignar_tecnico_de_otra_org_falla(self):
+        t = Ticket.objects.create(reference="TSA-X-1", titulo="a", descripcion="d",
+                                  creado_por=self.cust_a, organization=self.org_a)
+        self.client_api.force_authenticate(self.admin_a)
+        r = self.client_api.patch(f"/api/tickets_t/{t.id}/", {"asignado_a": self.agent_b.id})
+        self.assertEqual(r.status_code, 400)
+
+    def test_can_access_niega_cross_org_y_superuser_sin_org(self):
+        self.assertFalse(can_access_ticket(self.admin_a, self.t_b))
+        plat = User.objects.create_user("plat_su", is_superuser=True)
+        self.assertFalse(can_access_ticket(plat, self.t_b))
+
+    def test_superuser_sin_org_no_puede_crear_ticket(self):
+        plat = User.objects.create_user("plat_su2", is_superuser=True)
+        self.client_api.force_authenticate(plat)
+        r = self.client_api.post("/api/tickets_t/", {"titulo": "t", "descripcion": "d",
+                                                     "prioridad": "MEDIUM"})
+        self.assertEqual(r.status_code, 400)  # fail-closed, nunca 500

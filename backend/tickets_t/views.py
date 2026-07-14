@@ -19,6 +19,7 @@ from .serializers import (
 from .validators import validate_attachment
 from .permissions import can_access_ticket
 from .payloads import message_to_payload
+from tenancy.scoping import org_tickets
 
 logger = logging.getLogger(__name__)
 
@@ -28,23 +29,22 @@ def _role(user):
 
 
 def _is_admin(user):
-    return bool(user and user.is_authenticated and (user.is_superuser or _role(user) == "ADMIN"))
+    return bool(user and user.is_authenticated and _role(user) == "ADMIN")
 
 
 def _is_agent(user):
-    return bool(user and user.is_authenticated and (_role(user) == "AGENT" or user.is_superuser))
+    return bool(user and user.is_authenticated and _role(user) == "AGENT")
 
 
 class TicketViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = Ticket.objects.all()
     serializer_class = TicketSerializer
 
     def get_queryset(self):
         user = self.request.user
         r = _role(user)
-        qs = Ticket.objects.select_related("sla", "csat").all().order_by("-created_at")
-        if r == "ADMIN" or user.is_superuser:
+        qs = org_tickets(self.request.organization).order_by("-created_at")
+        if r == "ADMIN":
             return qs
         if r == "AGENT":
             return qs.filter(asignado_a=user)
@@ -57,10 +57,14 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
-        if self.action != "create":
+        org = getattr(self.request, "organization", None)
+        if self.action != "create" and org is not None:
             try:
                 from sla.calendar_engine import get_calendar
-                ctx["sla_calendar"] = get_calendar()
+                # Precalienta el cache por-org que lee TicketSerializer.get_sla
+                # (evita N+1: 1 sola consulta de config/feriados para el caso
+                # comun de un request con tickets de una sola organizacion).
+                ctx["sla_calendars"] = {org.id: get_calendar(org)}
             except Exception:
                 logger.warning("no se pudo cargar el calendario SLA", exc_info=True)
         return ctx
@@ -115,7 +119,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         user = request.user
         if not (_is_admin(user) or _is_agent(user)):
             return Response({"detail": "Solo técnicos o admin."}, status=403)
-        qs = Ticket.objects.select_related("sla", "csat").filter(
+        qs = org_tickets(request.organization).filter(
             asignado_a__isnull=True,
             estado__in=["OPEN", "IN_PROGRESS"],
         ).order_by("-created_at")
@@ -129,7 +133,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Solo técnicos pueden tomar tickets."}, status=403)
         try:
             with transaction.atomic():
-                ticket = Ticket.objects.select_for_update().get(pk=pk)
+                ticket = org_tickets(request.organization).select_for_update().get(pk=pk)
                 if ticket.asignado_a_id and ticket.asignado_a_id != user.id:
                     return Response({"detail": "Ya asignado a otro técnico."}, status=409)
                 if ticket.asignado_a_id == user.id:
@@ -151,7 +155,7 @@ class TicketViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="attachments",
             parser_classes=[MultiPartParser, FormParser])
     def upload_attachment(self, request, pk=None):
-        ticket = Ticket.objects.filter(pk=pk).first()
+        ticket = org_tickets(request.organization).filter(pk=pk).first()
         if ticket is None:
             return Response({"detail": "No encontrado."}, status=404)
         if not can_access_ticket(request.user, ticket):
@@ -197,7 +201,7 @@ class TicketViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"],
             url_path=r"attachments/(?P<message_id>[^/.]+)/download")
     def download_attachment(self, request, pk=None, message_id=None):
-        ticket = Ticket.objects.filter(pk=pk).first()
+        ticket = org_tickets(request.organization).filter(pk=pk).first()
         if ticket is None:
             return Response({"detail": "No encontrado."}, status=404)
         if not can_access_ticket(request.user, ticket):

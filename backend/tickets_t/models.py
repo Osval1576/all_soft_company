@@ -58,9 +58,17 @@ class Ticket(models.Model):
         blank=True,
         related_name="tickets_asignados",
     )
+    organization = models.ForeignKey(
+        "tenancy.Organization",
+        on_delete=models.PROTECT,
+        related_name="tickets",
+    )
 
     created_at = models.DateTimeField(default=timezone.now, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["organization", "created_at"])]
 
     def __str__(self):
         return f"{self.reference} - {self.titulo}"

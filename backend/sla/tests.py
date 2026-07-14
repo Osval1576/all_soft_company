@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from tenancy.testing import create_org
 from tickets_t.models import Ticket, TicketMessage, TicketEvent
 from sla.models import SlaConfig, SlaPolicy, TicketSla
 from sla.calendar_engine import Calendar, add_business_time, business_minutes_between
@@ -30,27 +31,30 @@ def _mx(y, m, d, hh, mm):
 
 
 class ModelTests(TestCase):
-    def test_config_singleton_defaults(self):
-        cfg = SlaConfig.objects.get_solo()
-        self.assertEqual(cfg.pk, 1)
+    def test_config_provisioned_defaults(self):
+        org = create_org("MDT1")
+        cfg = SlaConfig.objects.get(organization=org)
         self.assertEqual(cfg.business_timezone, "America/Mexico_City")
         self.assertEqual(cfg.work_days, "1,2,3,4,5")
         self.assertEqual(cfg.at_risk_threshold_pct, 25)
-        # idempotente
-        self.assertEqual(SlaConfig.objects.get_solo().pk, 1)
-        self.assertEqual(SlaConfig.objects.count(), 1)
+        # idempotente: create_org() de nuevo con el mismo slug no duplica
+        create_org("MDT1")
+        self.assertEqual(SlaConfig.objects.filter(organization=org).count(), 1)
 
     def test_policies_seeded(self):
-        self.assertEqual(SlaPolicy.objects.count(), 4)
-        urgent = SlaPolicy.objects.get(priority="URGENT")
+        org = create_org("MDT2")
+        self.assertEqual(SlaPolicy.objects.filter(organization=org).count(), 4)
+        urgent = SlaPolicy.objects.get(organization=org, priority="URGENT")
         self.assertEqual(urgent.first_response_minutes, 30)
         self.assertEqual(urgent.resolution_minutes, 240)
 
     def test_ticket_sla_onetoone(self):
-        cu = User.objects.create_user(username="c", password="x", role="CUSTOMER")
+        org = create_org("SLT")
+        cu = User.objects.create_user(username="c", password="x", role="CUSTOMER", organization=org)
         t = Ticket.objects.create(
             reference="ALS-20260101-000500", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="OPEN", creado_por=cu,
+            organization=org,
         )
         # El signal de creacion (Task 4) ya crea un TicketSla automaticamente;
         # se limpia para probar el modelo/relacion OneToOne en aislamiento.
@@ -113,10 +117,12 @@ class CalendarTests(TestCase):
 
 class LevelTests(TestCase):
     def setUp(self):
-        cu = User.objects.create_user(username="lc", password="x", role="CUSTOMER")
+        self.org = create_org("SLT")
+        cu = User.objects.create_user(username="lc", password="x", role="CUSTOMER", organization=self.org)
         self.t = Ticket.objects.create(
             reference="ALS-20260101-000510", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="OPEN", creado_por=cu,
+            organization=self.org,
         )
 
     def _sla(self, **kw):
@@ -153,14 +159,16 @@ class LevelTests(TestCase):
 
 class SignalTests(TestCase):
     def setUp(self):
-        self.agent = User.objects.create_user(username="sg_ag", password="x", role="AGENT")
-        self.customer = User.objects.create_user(username="sg_cu", password="x", role="CUSTOMER")
+        self.org = create_org("SLT")
+        self.agent = User.objects.create_user(username="sg_ag", password="x", role="AGENT", organization=self.org)
+        self.customer = User.objects.create_user(username="sg_cu", password="x", role="CUSTOMER", organization=self.org)
 
     def _ticket(self, prioridad="MEDIUM"):
         return Ticket.objects.create(
             reference=f"ALS-20260101-0006{prioridad[:2]}", titulo="T", descripcion="d",
             prioridad=prioridad, estado="OPEN",
             creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org,
         )
 
     def test_ticket_creation_creates_sla_with_budgets(self):
@@ -214,14 +222,16 @@ class SignalTests(TestCase):
 @override_settings(NOTIFICATIONS_EMAIL_ASYNC=False)
 class CheckerTests(TestCase):
     def setUp(self):
-        self.agent = User.objects.create_user(username="ck_ag", password="x", role="AGENT")
-        self.admin = User.objects.create_user(username="ck_adm", password="x", role="ADMIN")
-        self.customer = User.objects.create_user(username="ck_cu", password="x", role="CUSTOMER")
+        self.org = create_org("SLT")
+        self.agent = User.objects.create_user(username="ck_ag", password="x", role="AGENT", organization=self.org)
+        self.admin = User.objects.create_user(username="ck_adm", password="x", role="ADMIN", organization=self.org)
+        self.customer = User.objects.create_user(username="ck_cu", password="x", role="CUSTOMER", organization=self.org)
 
     def _ticket_with_breached_res(self):
         t = Ticket.objects.create(
             reference="ALS-20260101-000800", titulo="T", descripcion="d",
             prioridad="HIGH", estado="OPEN", creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org,
         )
         ts = t.sla
         # forzar reloj de resolución vencido y 1a respuesta ya cumplida
@@ -256,10 +266,12 @@ from rest_framework.test import APIClient
 
 class SerializerSlaTests(TestCase):
     def setUp(self):
-        self.customer = User.objects.create_user(username="ss_cu", password="x", role="CUSTOMER")
+        self.org = create_org("SLT")
+        self.customer = User.objects.create_user(username="ss_cu", password="x", role="CUSTOMER", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-000900", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="OPEN", creado_por=self.customer,
+            organization=self.org,
         )
 
     def test_ticket_payload_includes_sla(self):
@@ -280,6 +292,7 @@ class SerializerSlaTests(TestCase):
         Ticket.objects.create(
             reference="ALS-20260101-000901", titulo="T2", descripcion="d",
             prioridad="MEDIUM", estado="OPEN", creado_por=self.customer,
+            organization=self.org,
         )
         c = APIClient()
         c.force_authenticate(user=self.customer)
@@ -291,8 +304,9 @@ class SerializerSlaTests(TestCase):
 
 class AdminApiTests(TestCase):
     def setUp(self):
-        self.admin = User.objects.create_user(username="aa_adm", password="x", role="ADMIN")
-        self.customer = User.objects.create_user(username="aa_cu", password="x", role="CUSTOMER")
+        self.org = create_org("SLT")
+        self.admin = User.objects.create_user(username="aa_adm", password="x", role="ADMIN", organization=self.org)
+        self.customer = User.objects.create_user(username="aa_cu", password="x", role="CUSTOMER", organization=self.org)
 
     def _c(self, u):
         c = APIClient(); c.force_authenticate(user=u); return c
@@ -316,7 +330,8 @@ class AdminApiTests(TestCase):
                      [{"priority": "URGENT", "first_response_minutes": 15, "resolution_minutes": 120}],
                      format="json")
         self.assertEqual(r2.status_code, 200)
-        self.assertEqual(SlaPolicy.objects.get(priority="URGENT").first_response_minutes, 15)
+        self.assertEqual(
+            SlaPolicy.objects.get(organization=self.org, priority="URGENT").first_response_minutes, 15)
 
     def test_holidays_crud(self):
         c = self._c(self.admin)
@@ -325,6 +340,42 @@ class AdminApiTests(TestCase):
         hid = r.json()["id"]
         self.assertEqual(c.get("/api/admin/sla/holidays/").status_code, 200)
         self.assertEqual(c.delete(f"/api/admin/sla/holidays/{hid}/").status_code, 204)
+
+    def test_config_serializer_does_not_expose_organization_as_writable(self):
+        # PATCHear organization no debe reasignar el OneToOne (exposicion del
+        # boundary de tenant); el campo debe ser ignorado por el serializer.
+        other_org = create_org("SLT2")
+        c = self._c(self.admin)
+        cfg_before = SlaConfig.objects.get(organization=self.org)
+        r = c.patch("/api/admin/sla/config/", {"organization": other_org.id}, format="json")
+        self.assertEqual(r.status_code, 200)
+        # sigue existiendo con el mismo pk bajo self.org: el PATCH no reasigno
+        # el OneToOne al mandar "organization" en el payload (campo ignorado).
+        cfg_after = SlaConfig.objects.get(organization=self.org)
+        self.assertEqual(cfg_after.pk, cfg_before.pk)
+
+
+class PlatformSuperuserNoOrgTests(TestCase):
+    """Superuser de plataforma (organization=None) no debe recibir 500 al
+    pegarle a endpoints scoped por organizacion: debe ser un 404 explicito."""
+
+    def setUp(self):
+        self.org = create_org("PSU1")
+        self.superuser = User.objects.create_user(
+            username="platform_su", password="x", role="ADMIN",
+            is_superuser=True, organization=None,
+        )
+
+    def _c(self):
+        c = APIClient(); c.force_authenticate(user=self.superuser); return c
+
+    def test_sla_config_get_returns_404_not_500(self):
+        r = self._c().get("/api/admin/sla/config/")
+        self.assertEqual(r.status_code, 404)
+
+    def test_sla_config_patch_returns_404_not_500(self):
+        r = self._c().patch("/api/admin/sla/config/", {"at_risk_threshold_pct": 40}, format="json")
+        self.assertEqual(r.status_code, 404)
 
 
 from io import StringIO
@@ -335,7 +386,8 @@ from django.core.management import call_command
 
 class CheckSlaLoopTests(TestCase):
     def setUp(self):
-        cfg = SlaConfig.objects.get_solo()
+        org = create_org("CKL")
+        cfg = SlaConfig.objects.get(organization=org)
         cfg.scheduler_interval_minutes = 1
         cfg.scheduler_enabled = True
         cfg.save()
@@ -351,3 +403,76 @@ class CheckSlaLoopTests(TestCase):
         out = StringIO()
         call_command("check_sla", stdout=out)
         self.assertEqual(out.getvalue().count("SLA check:"), 1)
+
+
+class PerOrgSlaTests(TestCase):
+    def setUp(self):
+        from tenancy.testing import create_org
+        self.a = create_org("SLA1")
+        self.b = create_org("SLB2")
+
+    def test_config_por_org_independiente(self):
+        ca = SlaConfig.objects.get(organization=self.a)
+        cb = SlaConfig.objects.get(organization=self.b)
+        ca.work_start = time(7, 0); ca.save()
+        cb.refresh_from_db()
+        self.assertEqual(cb.work_start, time(9, 0))
+
+    def test_calendarios_distintos_producen_deadlines_distintos(self):
+        from sla.calendar_engine import get_calendar, add_business_time
+        ca = SlaConfig.objects.get(organization=self.a)
+        ca.work_end = time(20, 0); ca.save()
+        start = datetime(2026, 1, 5, 17, 0, tzinfo=MX)  # lunes 17:00
+        due_a = add_business_time(start, 120, get_calendar(self.a))  # hasta 20h: mismo dia
+        due_b = add_business_time(start, 120, get_calendar(self.b))  # hasta 18h: cruza al martes
+        self.assertNotEqual(due_a, due_b)
+
+    def test_provisioning_al_crear_org(self):
+        from tenancy.models import Organization
+        org = Organization.objects.create(name="Nueva", slug="NEW")
+        self.assertTrue(SlaConfig.objects.filter(organization=org).exists())
+        self.assertEqual(SlaPolicy.objects.filter(organization=org).count(), 4)
+
+
+@override_settings(NOTIFICATIONS_EMAIL_ASYNC=False)
+class SchedulerEnabledPerOrgTests(TestCase):
+    """scheduler_enabled=False debe excluir la org del barrido de run_sla_check(),
+    no sólo regular la cadencia del loop del comando de management."""
+
+    def setUp(self):
+        self.org_on = create_org("SCH1")
+        self.org_off = create_org("SCH2")
+        cfg_off = SlaConfig.objects.get(organization=self.org_off)
+        cfg_off.scheduler_enabled = False
+        cfg_off.save()
+
+    def _breached_ticket(self, org, suffix):
+        agent = User.objects.create_user(username=f"ag_{suffix}", password="x", role="AGENT", organization=org)
+        customer = User.objects.create_user(username=f"cu_{suffix}", password="x", role="CUSTOMER", organization=org)
+        t = Ticket.objects.create(
+            reference=f"ALS-20260101-0007{suffix}", titulo="T", descripcion="d",
+            prioridad="HIGH", estado="OPEN", creado_por=customer, asignado_a=agent,
+            organization=org,
+        )
+        ts = t.sla
+        ts.first_response_met_at = timezone.now()
+        ts.fr_level = "met"
+        ts.resolution_due_at = timezone.now() - timezone.timedelta(hours=1)
+        ts.res_level = "ok"
+        ts.save()
+        return t
+
+    def test_scheduler_disabled_org_is_skipped(self):
+        t_on = self._breached_ticket(self.org_on, "10")
+        t_off = self._breached_ticket(self.org_off, "20")
+
+        run_sla_check()
+
+        t_on.sla.refresh_from_db()
+        t_off.sla.refresh_from_db()
+        self.assertEqual(t_on.sla.res_level, "breached")
+        self.assertEqual(t_off.sla.res_level, "ok")  # org deshabilitada: no se toca
+        self.assertTrue(
+            Notification.objects.filter(kind="sla_breached", ticket=t_on).exists())
+        self.assertFalse(
+            Notification.objects.filter(kind="sla_breached", ticket=t_off).exists())

@@ -63,6 +63,7 @@ class ContactEndpointTests(TestCase):
             reference=first_ref,
             titulo="pre", descripcion="pre", prioridad="MEDIUM", estado="OPEN",
             creado_por=pre_user,
+            organization=contact_view._als_org(),  # tickets de contacto -> org semilla ALS
         )
 
         calls = {"n": 0}

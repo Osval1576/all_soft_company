@@ -1,5 +1,6 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from tenancy.testing import create_org
 from tickets_t.models import Ticket
 from csat.models import CSATResponse
 from csat.eligibility import is_eligible
@@ -10,10 +11,12 @@ User = get_user_model()
 
 class ModelTests(TestCase):
     def setUp(self):
-        self.customer = User.objects.create_user(username="cs_m_cu", password="x", role="CUSTOMER")
+        self.org = create_org("CST")
+        self.customer = User.objects.create_user(username="cs_m_cu", password="x", role="CUSTOMER", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-001000", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="RESOLVED", creado_por=self.customer,
+            organization=self.org,
         )
 
     def test_creates_response_with_defaults(self):
@@ -30,12 +33,14 @@ class ModelTests(TestCase):
 
 class EligibilityTests(TestCase):
     def setUp(self):
-        self.customer = User.objects.create_user(username="el_cu", password="x", role="CUSTOMER")
+        self.org = create_org("CST")
+        self.customer = User.objects.create_user(username="el_cu", password="x", role="CUSTOMER", organization=self.org)
 
     def _ticket(self, estado, ref):
         return Ticket.objects.create(
             reference=ref, titulo="T", descripcion="d",
             prioridad="MEDIUM", estado=estado, creado_por=self.customer,
+            organization=self.org,
         )
 
     def test_eligible_states(self):
@@ -49,10 +54,12 @@ class EligibilityTests(TestCase):
 
 class PayloadTests(TestCase):
     def setUp(self):
-        self.customer = User.objects.create_user(username="pl_cu", password="x", role="CUSTOMER")
+        self.org = create_org("CST")
+        self.customer = User.objects.create_user(username="pl_cu", password="x", role="CUSTOMER", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-001020", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="RESOLVED", creado_por=self.customer,
+            organization=self.org,
         )
 
     def test_payload_none_without_response(self):
@@ -71,13 +78,15 @@ from rest_framework.test import APIClient
 
 class SubmitCsatTests(TestCase):
     def setUp(self):
-        self.customer = User.objects.create_user(username="sub_cu", password="x", role="CUSTOMER")
-        self.stranger = User.objects.create_user(username="sub_x", password="x", role="CUSTOMER")
-        self.agent = User.objects.create_user(username="sub_ag", password="x", role="AGENT")
+        self.org = create_org("CST")
+        self.customer = User.objects.create_user(username="sub_cu", password="x", role="CUSTOMER", organization=self.org)
+        self.stranger = User.objects.create_user(username="sub_x", password="x", role="CUSTOMER", organization=self.org)
+        self.agent = User.objects.create_user(username="sub_ag", password="x", role="AGENT", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-001030", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="RESOLVED",
             creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org,
         )
 
     def _client(self, user):
@@ -124,12 +133,14 @@ class SubmitCsatTests(TestCase):
 
 class SerializerCsatTests(TestCase):
     def setUp(self):
-        self.customer = User.objects.create_user(username="sc_cu", password="x", role="CUSTOMER")
-        self.agent = User.objects.create_user(username="sc_ag", password="x", role="AGENT")
+        self.org = create_org("CST")
+        self.customer = User.objects.create_user(username="sc_cu", password="x", role="CUSTOMER", organization=self.org)
+        self.agent = User.objects.create_user(username="sc_ag", password="x", role="AGENT", organization=self.org)
         self.ticket = Ticket.objects.create(
             reference="ALS-20260101-001040", titulo="T", descripcion="d",
             prioridad="MEDIUM", estado="RESOLVED",
             creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org,
         )
 
     def _client(self, user):

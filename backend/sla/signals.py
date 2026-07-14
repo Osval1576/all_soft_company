@@ -8,19 +8,35 @@ from .calendar_engine import get_calendar, add_business_time
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_POLICIES = [("URGENT", 30, 240), ("HIGH", 60, 480),
+                    ("MEDIUM", 120, 960), ("LOW", 240, 1920)]
+
 
 def _agent_or_admin(user):
     r = getattr(user, "role", None)
     return r in ("AGENT", "ADMIN") or getattr(user, "is_superuser", False)
 
 
+@receiver(post_save, sender="tenancy.Organization")
+def provision_org_sla(sender, instance, created, **kwargs):
+    if not created:
+        return
+    from .models import SlaConfig, SlaPolicy
+    SlaConfig.objects.get_or_create(organization=instance)
+    for prio, fr, res in DEFAULT_POLICIES:
+        SlaPolicy.objects.get_or_create(
+            organization=instance, priority=prio,
+            defaults={"first_response_minutes": fr, "resolution_minutes": res})
+
+
 def create_ticket_sla(ticket):
     from .models import SlaPolicy, TicketSla
-    policy = SlaPolicy.objects.filter(priority=ticket.prioridad).first()
+    policy = SlaPolicy.objects.filter(
+        organization=ticket.organization, priority=ticket.prioridad).first()
     if policy is None:
         logger.warning("sin SlaPolicy para prioridad %s", ticket.prioridad)
         return None
-    cal = get_calendar()
+    cal = get_calendar(ticket.organization)
     start = ticket.created_at
     return TicketSla.objects.create(
         ticket=ticket,
@@ -76,10 +92,11 @@ def on_event_saved(sender, instance, created, **kwargs):
 
 def _recompute_unmet(ts, ticket):
     from .models import SlaPolicy
-    policy = SlaPolicy.objects.filter(priority=ticket.prioridad).first()
+    policy = SlaPolicy.objects.filter(
+        organization=ticket.organization, priority=ticket.prioridad).first()
     if policy is None:
         return
-    cal = get_calendar()
+    cal = get_calendar(ticket.organization)
     start = ticket.created_at
     fields = []
     if ts.first_response_met_at is None:
