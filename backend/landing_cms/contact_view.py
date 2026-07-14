@@ -7,17 +7,28 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from tickets_t.models import Ticket, TicketMessage
+from tenancy.scoping import org_tickets
+from tickets_t.models import TicketMessage
 
 from .serializers import ContactSerializer
 
 User = get_user_model()
 
 
+def _als_org():
+    # El formulario publico de contacto no tiene organizacion (es anonimo, sin
+    # request.organization): sus tickets son siempre de ALS/"AllSafe", la org
+    # semilla de la plataforma (mismo prefijo "ALS-" que ya usaba la referencia
+    # antes de multi-tenant). get_or_create la autocura si faltara.
+    from tenancy.models import Organization
+    org, _ = Organization.objects.get_or_create(slug="ALS", defaults={"name": "AllSafe"})
+    return org
+
+
 def _next_reference():
     prefix = "ALS-" + timezone.now().strftime("%Y%m%d") + "-"
     last = (
-        Ticket.objects.select_for_update()
+        org_tickets(_als_org()).select_for_update()
         .filter(reference__startswith=prefix)
         .order_by("-reference")
         .first()
@@ -57,13 +68,14 @@ class ContactView(APIView):
         for attempt in range(3):
             try:
                 with transaction.atomic():
-                    ticket = Ticket.objects.create(
+                    ticket = org_tickets(_als_org()).create(
                         reference=_next_reference(),
                         titulo=data["subject"],
                         descripcion=data["message"],
                         prioridad="MEDIUM",
                         estado="OPEN",
                         creado_por=user,
+                        organization=_als_org(),
                     )
                 break
             except IntegrityError:

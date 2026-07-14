@@ -61,8 +61,6 @@ class Ticket(models.Model):
     organization = models.ForeignKey(
         "tenancy.Organization",
         on_delete=models.PROTECT,
-        null=True,   # NOT NULL en T7, cuando todo el codigo ya la setea
-        blank=True,
         related_name="tickets",
     )
 

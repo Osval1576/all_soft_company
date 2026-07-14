@@ -59,11 +59,16 @@ class TicketChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def user_can_access_ticket(self, user_id, ticket_id):
         from django.contrib.auth import get_user_model
+        from tenancy.scoping import org_tickets
         User = get_user_model()
 
         try:
-            ticket = Ticket.objects.select_related("creado_por", "asignado_a").get(id=ticket_id)
             user = User.objects.get(id=user_id)
+            # Scoped por la org del usuario: un ticket de otra org ni siquiera
+            # aparece en el queryset (Ticket.DoesNotExist -> acceso denegado),
+            # sin depender solo del chequeo de org en can_access_ticket.
+            ticket = org_tickets(user.organization).select_related(
+                "creado_por", "asignado_a").get(id=ticket_id)
         except (Ticket.DoesNotExist, User.DoesNotExist):
             return False
 
@@ -72,9 +77,10 @@ class TicketChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def create_message(self, user_id, ticket_id, content):
         from django.contrib.auth import get_user_model
+        from tenancy.scoping import org_tickets
         User = get_user_model()
         user = User.objects.get(id=user_id)
-        ticket = Ticket.objects.get(id=ticket_id)
+        ticket = org_tickets(user.organization).get(id=ticket_id)
 
         m = TicketMessage.objects.create(
             ticket=ticket,

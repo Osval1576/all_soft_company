@@ -47,18 +47,19 @@ import importlib
 
 
 class SeedMigrationTests(TestCase):
-    def test_seed_asigna_todo_a_la_org_semilla(self):
-        from tickets_t.models import Ticket
+    def test_seed_asigna_usuarios_sin_org_a_la_semilla(self):
+        # User.organization sigue nullable; Ticket.organization es NOT NULL desde
+        # T7, asi que ya NO se puede reproducir un ticket sin org con el modelo
+        # real (esa garantia la impone ahora el schema, no este test). Se cubre la
+        # rama de usuarios legacy, que sigue siendo el caso reproducible.
         u = User.objects.create_user("legacy_user", role="CUSTOMER")
-        t = Ticket.objects.create(reference="LEG-001", titulo="t", descripcion="d",
-                                  creado_por=u)
+        self.assertIsNone(u.organization)
         mod = importlib.import_module("tenancy.migrations.0002_seed_org")
         from django.apps import apps as global_apps
         mod.seed_org(global_apps, None)
-        u.refresh_from_db(); t.refresh_from_db()
+        u.refresh_from_db()
         self.assertIsNotNone(u.organization)
         self.assertEqual(u.organization.slug, "ALS")
-        self.assertEqual(t.organization_id, u.organization_id)
 
     def test_seed_idempotente(self):
         mod = importlib.import_module("tenancy.migrations.0002_seed_org")
@@ -94,3 +95,34 @@ class MiddlewareTests(TestCase):
 
     def test_health_y_auth_exentos(self):
         self.assertEqual(self.client_api.get("/api/health/").status_code, 200)
+
+
+import pathlib
+
+
+class RawQuerysetGuardTests(TestCase):
+    """Anti-regresion: nadie debe consultar Ticket sin pasar por org_tickets().
+
+    Un queryset crudo de Ticket.objects fuera de tenancy/scoping.py es, por
+    definicion, un candidato a fuga cross-tenant (nada garantiza que este
+    filtrado por organizacion). Allowlist minimo y justificado UNA POR UNA:
+    """
+    ALLOWED = {
+        "tenancy/scoping.py",            # fuente unica
+        "tickets_t/serializers.py",      # contador de referencia por prefijo (org-scoped por slug)
+    }
+
+    def test_sin_ticket_objects_crudo_fuera_del_allowlist(self):
+        backend = pathlib.Path(__file__).resolve().parent.parent
+        offenders = []
+        for path in backend.rglob("*.py"):
+            rel = path.relative_to(backend).as_posix()
+            if ("migrations" in rel or rel.startswith("tenancy/tests")
+                    or "/tests/" in rel  # p.ej. landing_cms/tests/test_*.py: paquete de tests
+                    or rel.endswith(("tests.py", "tests_isolation.py"))
+                    or rel in self.ALLOWED):
+                continue
+            if "Ticket.objects" in path.read_text(encoding="utf-8", errors="ignore"):
+                offenders.append(rel)
+        self.assertEqual(offenders, [],
+                         f"Queryset crudo de Ticket fuera de tenancy/scoping.py: {offenders}")
