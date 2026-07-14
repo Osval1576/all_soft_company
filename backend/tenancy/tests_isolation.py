@@ -203,6 +203,9 @@ class WsChatCrossTenantTests(TransactionTestCase):
         token = str(AccessToken.for_user(user_a))
         communicator = WebsocketCommunicator(application, f"/ws/chat/{ticket_b.id}/")
         communicator.scope["headers"] = [(b"cookie", f"access={token}".encode())]
-        connected, _ = await communicator.connect()
+        connected, close_code = await communicator.connect()
         self.assertFalse(connected)
+        # 4403 = rechazo por autorización (org ajena), no 4401 (auth fallida):
+        # el usuario de A está autenticado, el ticket de B simplemente no existe para él
+        self.assertEqual(close_code, 4403)
         await communicator.disconnect()

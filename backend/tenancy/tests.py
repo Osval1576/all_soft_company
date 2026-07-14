@@ -117,6 +117,10 @@ class RawQuerysetGuardTests(TestCase):
         offenders = []
         for path in backend.rglob("*.py"):
             rel = path.relative_to(backend).as_posix()
+            # sólo código del proyecto: excluir venv/site-packages (perf + evita
+            # falsos positivos si una dependencia contuviera el literal)
+            if rel.startswith((".venv/", "venv/", "env/")) or "/site-packages/" in rel:
+                continue
             if ("migrations" in rel or rel.startswith("tenancy/tests")
                     or "/tests/" in rel  # p.ej. landing_cms/tests/test_*.py: paquete de tests
                     or rel.endswith(("tests.py", "tests_isolation.py"))

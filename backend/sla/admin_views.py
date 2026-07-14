@@ -31,6 +31,8 @@ class PoliciesView(APIView):
     permission_classes = [IsAdminRole]
 
     def get(self, request):
+        if request.organization is None:
+            return Response({"detail": "Sin organización."}, status=404)
         qs = SlaPolicy.objects.filter(organization=request.organization).order_by("priority")
         return Response(SlaPolicySerializer(qs, many=True).data)
 

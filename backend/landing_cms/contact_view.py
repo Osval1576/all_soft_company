@@ -58,6 +58,7 @@ class ContactView(APIView):
                 email=data["email"],
                 first_name=data["name"][:30],
                 role="CUSTOMER",
+                organization=_als_org(),  # el submitter anonimo pertenece a la org semilla
             )
             user.set_unusable_password()
             try:
