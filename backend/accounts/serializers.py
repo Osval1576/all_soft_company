@@ -47,3 +47,31 @@ class RegisterSerializer(serializers.Serializer):
         user.save()
         token = EmailVerificationToken.objects.create(user=user)
         return user, token
+
+
+class InvitationCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Invitation
+        fields = ["id", "email", "role", "status", "created_at", "expires_at"]
+        read_only_fields = ["id", "status", "created_at", "expires_at"]
+
+    def validate_role(self, value):
+        if value not in ("AGENT", "CUSTOMER"):
+            raise serializers.ValidationError("Rol inválido para invitación.")
+        return value
+
+    def validate_email(self, value):
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Ese email ya tiene una cuenta.")
+        org = self.context["request"].organization
+        if Invitation.objects.filter(organization=org, email__iexact=value,
+                                     status="pending").exists():
+            raise serializers.ValidationError("Ya hay una invitación pendiente para ese email.")
+        return value
+
+
+class AcceptInvitationSerializer(serializers.Serializer):
+    first_name = serializers.CharField(max_length=30)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    password = serializers.CharField(min_length=8, write_only=True)
+    # NO acepta role/organization: se toman del token en la vista (anti-escalada).
