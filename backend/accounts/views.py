@@ -1,3 +1,4 @@
+from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -17,7 +18,12 @@ class RegisterView(APIView):
     def post(self, request):
         ser = RegisterSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        user, token = ser.save()
+        try:
+            user, token = ser.save()
+        except IntegrityError:
+            return Response(
+                {"detail": "Ya existe una cuenta u organización con esos datos."}, status=400
+            )
         send_verification_email(user, token.token)
         return Response({"ok": True}, status=status.HTTP_201_CREATED)
 

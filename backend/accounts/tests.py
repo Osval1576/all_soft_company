@@ -78,3 +78,13 @@ class RegisterFlowTests(TestCase):
     def test_resend_no_revela_existencia(self):
         r1 = self.c.post("/api/auth/resend-verification/", {"email": "nadie@x.com"}, format="json")
         self.assertEqual(r1.status_code, 200)
+
+    def test_org_name_duplicado_400(self):
+        r1 = self.c.post("/api/auth/register/", {
+            "org_name": "Duplicada SA", "first_name": "a", "last_name": "b",
+            "email": "primero@x.com", "password": "s3cretpass"}, format="json")
+        self.assertEqual(r1.status_code, 201)
+        r2 = self.c.post("/api/auth/register/", {
+            "org_name": "Duplicada SA", "first_name": "c", "last_name": "d",
+            "email": "segundo@x.com", "password": "s3cretpass"}, format="json")
+        self.assertEqual(r2.status_code, 400)
