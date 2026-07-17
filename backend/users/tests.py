@@ -91,3 +91,22 @@ class RetireCreateAndLastAdminTests(TestCase):
         self.c.patch(f"/api/users/users/{agent.id}/", {"is_staff": True}, format="json")
         agent.refresh_from_db()
         self.assertFalse(agent.is_staff)
+
+    def test_customer_no_puede_autopromoverse_a_admin(self):
+        cust = User.objects.create_user("rca_cust", role="CUSTOMER", organization=self.org)
+        c = APIClient(); c.force_authenticate(cust)
+        r = c.patch(f"/api/users/users/{cust.id}/", {"role": "ADMIN"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        cust.refresh_from_db()
+        self.assertEqual(cust.role, "CUSTOMER")
+
+    def test_desactivar_ultimo_admin_falla(self):
+        r = self.c.patch(f"/api/users/users/{self.admin.id}/", {"is_active": False}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_degradar_uno_de_dos_admins_permitido(self):
+        other = User.objects.create_user("rca_adm2", role="ADMIN", organization=self.org)
+        r = self.c.patch(f"/api/users/users/{other.id}/", {"role": "AGENT"}, format="json")
+        self.assertEqual(r.status_code, 200)
+        other.refresh_from_db()
+        self.assertEqual(other.role, "AGENT")
