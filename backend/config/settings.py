@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "tenancy",
+    "accounts",
     "users",
     "tickets_t",
     "notifications",
@@ -56,7 +57,6 @@ INSTALLED_APPS = [
     "django_cleanup.apps.CleanupConfig",
 
     # Local apps (descomenta cuando existan)
-    # "accounts",
     # "tickets",
 ]
 
@@ -144,6 +144,9 @@ TIME_ZONE = _env("TIME_ZONE", "America/Mexico_City")
 USE_I18N = True
 USE_TZ = True
 
+# H2: base pública del frontend (links de verificación/invitación por email)
+FRONTEND_BASE_URL = _env("FRONTEND_BASE_URL", "http://localhost:5173")
+
 # Static files
 STATIC_URL = "static/"
 STATIC_ROOT = _env("DJANGO_STATIC_ROOT", str(BASE_DIR / "staticfiles"))
@@ -187,6 +190,8 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_THROTTLE_RATES": {
         "contact": "5/hour",
+        "register": "5/hour",
+        "resend": "5/hour",
     },
 }
 
