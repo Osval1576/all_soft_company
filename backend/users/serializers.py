@@ -19,7 +19,20 @@ class UserSerializer(serializers.ModelSerializer):
             "is_superuser",
             "date_joined",
         ]
-        read_only_fields = ["id", "is_superuser", "date_joined"]
+        read_only_fields = ["id", "is_staff", "is_superuser", "date_joined"]
+
+    def validate(self, attrs):
+        inst = self.instance
+        if inst is not None and inst.role == "ADMIN":
+            demoting = attrs.get("role", inst.role) != "ADMIN"
+            deactivating = attrs.get("is_active", inst.is_active) is False
+            if demoting or deactivating:
+                others = User.objects.filter(organization=inst.organization, role="ADMIN",
+                                             is_active=True).exclude(pk=inst.pk).exists()
+                if not others:
+                    raise serializers.ValidationError(
+                        "No podés dejar la organización sin un admin activo.")
+        return attrs
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
