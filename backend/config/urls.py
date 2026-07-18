@@ -28,6 +28,7 @@ v_settings_admin = SiteSettingsAdminView.as_view()
 urlpatterns = [
     path("django-admin/", admin.site.urls),
 
+    path("api/auth/", include("accounts.urls")),
     path("api/auth/login/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
@@ -35,6 +36,7 @@ urlpatterns = [
     path("api/health/", health, name="health"),
 
     path("api/users/", include("users.urls")),
+    path("api/invitations/", include("accounts.invitation_urls")),
     path("api/public/", include("landing_cms.public_urls")),
     path("api/admin/landing/", include("landing_cms.admin_urls")),
     path("api/admin/site-settings/", v_settings_admin),

@@ -6,6 +6,8 @@ from rest_framework.test import APIClient
 
 from config.checks import prod_settings_check
 
+User = get_user_model()
+
 
 class ProdSettingsCheckTests(TestCase):
     @override_settings(DEBUG=False, SECRET_KEY="CHANGE_ME__PUT_YOUR_OWN_SECRET_KEY_HERE")
@@ -65,5 +67,46 @@ class TenantUserAdminTests(TestCase):
         self.assertNotIn("utb_user", usernames)
         r = c.post("/api/users/users/", {"username": "nuevo_uta", "password": "x9!k2#pQ7",
                                          "role": "CUSTOMER"})
-        self.assertEqual(r.status_code, 201)
-        self.assertEqual(User.objects.get(username="nuevo_uta").organization_id, a.id)
+        self.assertEqual(r.status_code, 405)
+
+
+class RetireCreateAndLastAdminTests(TestCase):
+    def setUp(self):
+        from tenancy.testing import create_org
+        self.org = create_org("RCA")
+        self.admin = User.objects.create_user("rca_adm", role="ADMIN", organization=self.org)
+        self.c = APIClient(); self.c.force_authenticate(self.admin)
+
+    def test_create_deshabilitado(self):
+        r = self.c.post("/api/users/users/", {"username": "x", "password": "s3cretpass",
+                                              "role": "AGENT"}, format="json")
+        self.assertIn(r.status_code, (403, 405))
+
+    def test_no_puede_degradar_al_ultimo_admin(self):
+        r = self.c.patch(f"/api/users/users/{self.admin.id}/", {"role": "AGENT"}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_is_staff_read_only(self):
+        agent = User.objects.create_user("rca_ag", role="AGENT", organization=self.org)
+        self.c.patch(f"/api/users/users/{agent.id}/", {"is_staff": True}, format="json")
+        agent.refresh_from_db()
+        self.assertFalse(agent.is_staff)
+
+    def test_customer_no_puede_autopromoverse_a_admin(self):
+        cust = User.objects.create_user("rca_cust", role="CUSTOMER", organization=self.org)
+        c = APIClient(); c.force_authenticate(cust)
+        r = c.patch(f"/api/users/users/{cust.id}/", {"role": "ADMIN"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        cust.refresh_from_db()
+        self.assertEqual(cust.role, "CUSTOMER")
+
+    def test_desactivar_ultimo_admin_falla(self):
+        r = self.c.patch(f"/api/users/users/{self.admin.id}/", {"is_active": False}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_degradar_uno_de_dos_admins_permitido(self):
+        other = User.objects.create_user("rca_adm2", role="ADMIN", organization=self.org)
+        r = self.c.patch(f"/api/users/users/{other.id}/", {"role": "AGENT"}, format="json")
+        self.assertEqual(r.status_code, 200)
+        other.refresh_from_db()
+        self.assertEqual(other.role, "AGENT")

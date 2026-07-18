@@ -5,25 +5,20 @@ from rest_framework.permissions import IsAuthenticated
 from tenancy.scoping import org_users
 
 from .permissions import IsAdmin, IsAdminOrSelf
-from .serializers import UserSerializer, UserCreateSerializer
+from .serializers import UserSerializer
 
 User = get_user_model()
 
 
 class UserViewSet(viewsets.ModelViewSet):
+    http_method_names = ["get", "patch", "put", "delete", "head", "options"]
+    serializer_class = UserSerializer
+
     def get_queryset(self):
         return org_users(self.request.organization)
 
-    def get_serializer_class(self):
-        if self.action == "create":
-            return UserCreateSerializer
-        return UserSerializer
-
-    def perform_create(self, serializer):
-        serializer.save(organization=self.request.organization)
-
     def get_permissions(self):
-        if self.action in ["list", "create", "destroy"]:
+        if self.action in ["list", "destroy"]:
             return [IsAuthenticated(), IsAdmin()]
         if self.action in ["retrieve", "update", "partial_update"]:
             return [IsAuthenticated(), IsAdminOrSelf()]
