@@ -1,26 +1,51 @@
 <template>
-  <div class="login-page">
-    <div class="login-inner">
+  <div class="auth-page">
+    <div class="auth-inner" v-if="status === 'loading'">
+      <div class="panel">
+        <p class="eyebrow">Invitación</p>
+        <h1 class="lead">Cargando<br /><span class="lead-accent">la invitación...</span></h1>
+      </div>
+    </div>
+
+    <div class="auth-inner" v-else-if="status === 'error'">
+      <div class="panel">
+        <p class="eyebrow">No pudimos continuar</p>
+        <h1 class="lead">Invitación<br /><span class="lead-accent">inválida o vencida.</span></h1>
+        <p class="note">{{ errorMsg }}</p>
+        <router-link :to="{ name: 'login' }" class="btn-submit">
+          <span>Ir a iniciar sesión</span>
+          <span class="arrow" aria-hidden="true">→</span>
+        </router-link>
+      </div>
+    </div>
+
+    <div class="auth-inner" v-else>
       <div class="side">
-        <p class="eyebrow">Acceso privado</p>
+        <p class="eyebrow">Invitación</p>
         <h1 class="lead">
-          Bienvenido<br />
-          <span class="lead-accent">de vuelta.</span>
+          Te invitaron a<br />
+          <span class="lead-accent">{{ invitation.organization }}</span>
         </h1>
         <p class="note">
-          Iniciá sesión y volvemos al mismo tablero donde quedaron las conversaciones.
+          Vas a sumarte como <strong>{{ roleLabel }}</strong>. Completá tus datos para activar la
+          cuenta.
         </p>
       </div>
 
       <form @submit.prevent="onSubmit" class="form" novalidate>
         <label class="field">
-          <span class="field-label">Usuario</span>
-          <input
-            v-model="username"
-            placeholder="tu nombre de usuario"
-            autocomplete="username"
-            required
-          />
+          <span class="field-label">Email</span>
+          <input :value="invitation.email" disabled />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Nombre</span>
+          <input v-model="firstName" placeholder="tu nombre" autocomplete="given-name" required />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Apellido</span>
+          <input v-model="lastName" placeholder="tu apellido" autocomplete="family-name" />
         </label>
 
         <label class="field">
@@ -28,8 +53,8 @@
           <input
             v-model="password"
             type="password"
-            placeholder="••••••••"
-            autocomplete="current-password"
+            placeholder="mínimo 8 caracteres"
+            autocomplete="new-password"
             required
           />
         </label>
@@ -37,40 +62,74 @@
         <div v-if="error" class="error-msg">{{ error }}</div>
 
         <button type="submit" :disabled="loading" class="btn-submit">
-          <span>{{ loading ? "Iniciando sesión..." : "Iniciar sesión" }}</span>
+          <span>{{ loading ? "Activando cuenta..." : "Aceptar invitación" }}</span>
           <span v-if="!loading" class="arrow" aria-hidden="true">→</span>
         </button>
-
-        <p class="hint">
-          ¿Nuevo por acá? <router-link :to="{ name: 'registro' }">Registrá tu empresa</router-link>.
-        </p>
       </form>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { useAuthStore } from "../stores/auth.store";
+import { ref, computed, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { getInvitation, acceptInvitation } from "../../api/accounts.api";
+import { useAuthStore } from "../../stores/auth.store";
 
+const route = useRoute();
+const router = useRouter();
 const auth = useAuthStore();
-const username = ref("");
+
+const status = ref("loading");
+const errorMsg = ref("");
+const invitation = ref(null);
+
+const firstName = ref("");
+const lastName = ref("");
 const password = ref("");
 const loading = ref(false);
 const error = ref("");
 
+const roleLabel = computed(() => {
+  if (invitation.value?.role === "ADMIN") return "Admin";
+  if (invitation.value?.role === "AGENT") return "Técnico";
+  return "Cliente";
+});
+
+function extractError(e) {
+  return (
+    e?.response?.data?.detail ||
+    Object.values(e?.response?.data || {}).flat()[0] ||
+    e.message ||
+    "Error al aceptar la invitación"
+  );
+}
+
+onMounted(async () => {
+  try {
+    invitation.value = await getInvitation(route.params.token);
+    status.value = "ready";
+  } catch (e) {
+    errorMsg.value = extractError(e);
+    status.value = "error";
+  }
+});
+
 async function onSubmit() {
-  if (!username.value || !password.value) return;
+  if (!firstName.value || !password.value) return;
   loading.value = true;
   error.value = "";
   try {
-    await auth.login(username.value, password.value);
+    await acceptInvitation(route.params.token, {
+      first_name: firstName.value,
+      last_name: lastName.value,
+      password: password.value,
+    });
+    auth.loaded = false;
+    await auth.loadMe();
+    router.push(auth.redirectByRole());
   } catch (e) {
-    error.value =
-      e?.response?.data?.detail ||
-      Object.values(e?.response?.data || {}).flat()[0] ||
-      e.message ||
-      "Error al iniciar sesión";
+    error.value = extractError(e);
   } finally {
     loading.value = false;
   }
@@ -78,7 +137,7 @@ async function onSubmit() {
 </script>
 
 <style scoped>
-.login-page {
+.auth-page {
   min-height: calc(100vh - 68px);
   display: flex;
   align-items: center;
@@ -87,7 +146,7 @@ async function onSubmit() {
   position: relative;
   overflow: hidden;
 }
-.login-page::before {
+.auth-page::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -99,9 +158,9 @@ async function onSubmit() {
   opacity: 0.5;
   pointer-events: none;
 }
-[data-theme="dark"] .login-page::before { opacity: 0.7; }
+[data-theme="dark"] .auth-page::before { opacity: 0.7; }
 
-.login-inner {
+.auth-inner {
   position: relative;
   z-index: 1;
   max-width: 960px;
@@ -111,6 +170,8 @@ async function onSubmit() {
   gap: 72px;
   align-items: center;
 }
+.auth-inner:has(.panel) { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+.panel { max-width: 460px; }
 
 .eyebrow {
   font-family: var(--font-mono);
@@ -137,9 +198,10 @@ async function onSubmit() {
   font-size: 15px;
   color: var(--text-2);
   line-height: 1.6;
-  max-width: 320px;
-  margin: 0;
+  max-width: 380px;
+  margin: 0 0 24px;
 }
+.panel .note { margin: 0 auto 24px; }
 
 .form { display: flex; flex-direction: column; gap: 8px; }
 
@@ -172,6 +234,7 @@ async function onSubmit() {
   color: var(--text);
 }
 .field input::placeholder { color: var(--text-3); }
+.field input:disabled { color: var(--text-3); }
 
 .error-msg {
   margin: 14px 0 0;
@@ -202,6 +265,7 @@ async function onSubmit() {
   font-weight: 500;
   letter-spacing: 0.2px;
   cursor: pointer;
+  text-decoration: none;
   box-shadow: 0 10px 28px -12px var(--accent-glow);
   transition: transform .12s, box-shadow .15s, opacity .15s;
 }
@@ -210,21 +274,8 @@ async function onSubmit() {
 .btn-submit .arrow { transition: transform .18s; }
 .btn-submit:hover:not(:disabled) .arrow { transform: translateX(3px); }
 
-.hint {
-  margin: 24px 0 0;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--text-3);
-  text-align: center;
-}
-.hint a { color: var(--accent); text-decoration: none; }
-[data-theme="dark"] .hint a { color: var(--accent-2); }
-.hint a:hover { text-decoration: underline; text-underline-offset: 3px; }
-
 @media (max-width: 800px) {
-  .login-inner { grid-template-columns: 1fr; gap: 40px; }
+  .auth-inner { grid-template-columns: 1fr; gap: 40px; }
   .side { text-align: center; }
   .note { margin-left: auto; margin-right: auto; }
 }

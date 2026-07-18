@@ -5,6 +5,9 @@ import AdminLayout from "../layouts/AdminLayout.vue";
 
 import LoginView from "../views/LoginView.vue";
 import LandingHome from "../views/public/LandingHome.vue";
+import RegisterView from "../views/public/RegisterView.vue";
+import VerifyEmailView from "../views/public/VerifyEmailView.vue";
+import AcceptInvitationView from "../views/public/AcceptInvitationView.vue";
 
 import ClientDashboard from "../views/dashboards/ClientDashboard.vue";
 import TechnicianDashboard from "../views/dashboards/TechnicianDashboard.vue";
@@ -28,6 +31,9 @@ const routes = [
     children: [
       { path: "", name: "landing", component: LandingHome, meta: { public: true } },
       { path: "login", name: "login", component: LoginView, meta: { public: true } },
+      { path: "registro", name: "registro", component: RegisterView, meta: { public: true } },
+      { path: "verificar/:token", name: "verificar", component: VerifyEmailView, meta: { public: true } },
+      { path: "invitacion/:token", name: "invitacion", component: AcceptInvitationView, meta: { public: true } },
     ],
   },
   { path: "/cliente", name: "cliente", component: ClientDashboard, meta: { role: "CUSTOMER" } },

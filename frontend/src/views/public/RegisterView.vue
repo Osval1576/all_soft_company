@@ -1,24 +1,45 @@
 <template>
-  <div class="login-page">
-    <div class="login-inner">
+  <div class="auth-page">
+    <div class="auth-inner" v-if="!sent">
       <div class="side">
-        <p class="eyebrow">Acceso privado</p>
+        <p class="eyebrow">Nueva organización</p>
         <h1 class="lead">
-          Bienvenido<br />
-          <span class="lead-accent">de vuelta.</span>
+          Registrá<br />
+          <span class="lead-accent">tu empresa.</span>
         </h1>
         <p class="note">
-          Iniciá sesión y volvemos al mismo tablero donde quedaron las conversaciones.
+          Creamos tu organización y te dejamos como admin. Después invitás al resto del equipo.
         </p>
       </div>
 
       <form @submit.prevent="onSubmit" class="form" novalidate>
         <label class="field">
-          <span class="field-label">Usuario</span>
+          <span class="field-label">Organización</span>
           <input
-            v-model="username"
-            placeholder="tu nombre de usuario"
-            autocomplete="username"
+            v-model="orgName"
+            placeholder="nombre de tu empresa"
+            autocomplete="organization"
+            required
+          />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Nombre</span>
+          <input v-model="firstName" placeholder="tu nombre" autocomplete="given-name" required />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Apellido</span>
+          <input v-model="lastName" placeholder="tu apellido" autocomplete="family-name" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Email</span>
+          <input
+            v-model="email"
+            type="email"
+            placeholder="vos@empresa.com"
+            autocomplete="email"
             required
           />
         </label>
@@ -28,8 +49,8 @@
           <input
             v-model="password"
             type="password"
-            placeholder="••••••••"
-            autocomplete="current-password"
+            placeholder="mínimo 8 caracteres"
+            autocomplete="new-password"
             required
           />
         </label>
@@ -37,48 +58,107 @@
         <div v-if="error" class="error-msg">{{ error }}</div>
 
         <button type="submit" :disabled="loading" class="btn-submit">
-          <span>{{ loading ? "Iniciando sesión..." : "Iniciar sesión" }}</span>
+          <span>{{ loading ? "Creando cuenta..." : "Crear cuenta" }}</span>
           <span v-if="!loading" class="arrow" aria-hidden="true">→</span>
         </button>
 
         <p class="hint">
-          ¿Nuevo por acá? <router-link :to="{ name: 'registro' }">Registrá tu empresa</router-link>.
+          ¿Ya tenés cuenta? <router-link :to="{ name: 'login' }">Iniciá sesión</router-link>.
         </p>
       </form>
+    </div>
+
+    <div class="auth-inner sent-inner" v-else>
+      <div class="sent-panel">
+        <p class="eyebrow">Revisá tu email</p>
+        <h1 class="lead">
+          Revisá tu email<br />
+          <span class="lead-accent">para activar la cuenta.</span>
+        </h1>
+        <p class="note">
+          Te mandamos un link de activación a <strong>{{ email }}</strong>. Si no llega en unos
+          minutos, revisá spam o pedí que te lo reenviemos.
+        </p>
+
+        <div v-if="resendMsg" class="ok-msg">{{ resendMsg }}</div>
+        <div v-if="resendError" class="error-msg">{{ resendError }}</div>
+
+        <button type="button" :disabled="resending" class="btn-submit" @click="onResend">
+          <span>{{ resending ? "Reenviando..." : "Reenviar email" }}</span>
+        </button>
+
+        <p class="hint">
+          <router-link :to="{ name: 'login' }">Volver a iniciar sesión</router-link>
+        </p>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref } from "vue";
-import { useAuthStore } from "../stores/auth.store";
+import { registerOrg, resendVerification } from "../../api/accounts.api";
 
-const auth = useAuthStore();
-const username = ref("");
+const orgName = ref("");
+const firstName = ref("");
+const lastName = ref("");
+const email = ref("");
 const password = ref("");
+
 const loading = ref(false);
 const error = ref("");
+const sent = ref(false);
+
+const resending = ref(false);
+const resendMsg = ref("");
+const resendError = ref("");
+
+function extractError(e) {
+  return (
+    e?.response?.data?.detail ||
+    Object.values(e?.response?.data || {}).flat()[0] ||
+    e.message ||
+    "Error al registrar la cuenta"
+  );
+}
 
 async function onSubmit() {
-  if (!username.value || !password.value) return;
+  if (!orgName.value || !firstName.value || !email.value || !password.value) return;
   loading.value = true;
   error.value = "";
   try {
-    await auth.login(username.value, password.value);
+    await registerOrg({
+      org_name: orgName.value,
+      first_name: firstName.value,
+      last_name: lastName.value,
+      email: email.value,
+      password: password.value,
+    });
+    sent.value = true;
   } catch (e) {
-    error.value =
-      e?.response?.data?.detail ||
-      Object.values(e?.response?.data || {}).flat()[0] ||
-      e.message ||
-      "Error al iniciar sesión";
+    error.value = extractError(e);
   } finally {
     loading.value = false;
+  }
+}
+
+async function onResend() {
+  resending.value = true;
+  resendMsg.value = "";
+  resendError.value = "";
+  try {
+    await resendVerification(email.value);
+    resendMsg.value = "Listo, te reenviamos el email de activación.";
+  } catch (e) {
+    resendError.value = extractError(e);
+  } finally {
+    resending.value = false;
   }
 }
 </script>
 
 <style scoped>
-.login-page {
+.auth-page {
   min-height: calc(100vh - 68px);
   display: flex;
   align-items: center;
@@ -87,7 +167,7 @@ async function onSubmit() {
   position: relative;
   overflow: hidden;
 }
-.login-page::before {
+.auth-page::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -99,9 +179,9 @@ async function onSubmit() {
   opacity: 0.5;
   pointer-events: none;
 }
-[data-theme="dark"] .login-page::before { opacity: 0.7; }
+[data-theme="dark"] .auth-page::before { opacity: 0.7; }
 
-.login-inner {
+.auth-inner {
   position: relative;
   z-index: 1;
   max-width: 960px;
@@ -111,6 +191,8 @@ async function onSubmit() {
   gap: 72px;
   align-items: center;
 }
+.sent-inner { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+.sent-panel { max-width: 480px; }
 
 .eyebrow {
   font-family: var(--font-mono);
@@ -137,9 +219,10 @@ async function onSubmit() {
   font-size: 15px;
   color: var(--text-2);
   line-height: 1.6;
-  max-width: 320px;
-  margin: 0;
+  max-width: 380px;
+  margin: 0 0 24px;
 }
+.sent-panel .note { margin: 0 auto 24px; }
 
 .form { display: flex; flex-direction: column; gap: 8px; }
 
@@ -186,6 +269,19 @@ async function onSubmit() {
   text-transform: uppercase;
 }
 
+.ok-msg {
+  margin: 0 0 20px;
+  padding: 10px 14px;
+  border: 0.5px solid var(--accent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
 .btn-submit {
   margin-top: 20px;
   display: inline-flex;
@@ -224,7 +320,7 @@ async function onSubmit() {
 .hint a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 800px) {
-  .login-inner { grid-template-columns: 1fr; gap: 40px; }
+  .auth-inner { grid-template-columns: 1fr; gap: 40px; }
   .side { text-align: center; }
   .note { margin-left: auto; margin-right: auto; }
 }
