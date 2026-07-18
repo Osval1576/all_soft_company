@@ -76,6 +76,22 @@ class InvitationAdversarialTests(TestCase):
                                       status="pending").count(),
             1)
 
+    def test_agent_no_puede_invitar(self):
+        agent_a = User.objects.create_user("ada_agt", email="ada_agt@x.com", role="AGENT",
+                                           organization=self.org_a)
+        c = APIClient(); c.force_authenticate(agent_a)
+        r = c.post("/api/invitations/", {"email": "sneaky@x.com", "role": "AGENT"}, format="json")
+        self.assertEqual(r.status_code, 403)
+        self.assertFalse(Invitation.objects.filter(email="sneaky@x.com").exists())
+
+    def test_customer_no_puede_invitar(self):
+        customer_a = User.objects.create_user("ada_cus", email="ada_cus@x.com", role="CUSTOMER",
+                                              organization=self.org_a)
+        c = APIClient(); c.force_authenticate(customer_a)
+        r = c.post("/api/invitations/", {"email": "sneaky2@x.com", "role": "AGENT"}, format="json")
+        self.assertEqual(r.status_code, 403)
+        self.assertFalse(Invitation.objects.filter(email="sneaky2@x.com").exists())
+
     def test_lista_invitaciones_no_incluye_otra_org(self):
         self._invite(self.admin_a, "a_guy@x.com")
         self._invite(self.admin_b, "b_guy2@x.com")
