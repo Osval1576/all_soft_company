@@ -92,6 +92,18 @@ class InvitationAdversarialTests(TestCase):
         self.assertEqual(r.status_code, 403)
         self.assertFalse(Invitation.objects.filter(email="sneaky2@x.com").exists())
 
+    def test_accept_con_email_tomado_en_carrera_devuelve_409(self):
+        # Invitación creada mientras el email todavía estaba libre...
+        inv = self._invite(self.admin_a, "taken@x.com")
+        # ...pero alguien se registra/crea con ese mismo email antes del accept (carrera).
+        User.objects.create_user("taken@x.com", email="taken@x.com", role="CUSTOMER",
+                                 organization=self.org_b)
+        pub = APIClient()
+        r = pub.post(f"/api/auth/invitation/{inv.token}/accept/",
+                     {"first_name": "T", "password": "s3cretpass"}, format="json")
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(User.objects.filter(email__iexact="taken@x.com").count(), 1)
+
     def test_lista_invitaciones_no_incluye_otra_org(self):
         self._invite(self.admin_a, "a_guy@x.com")
         self._invite(self.admin_b, "b_guy2@x.com")

@@ -115,14 +115,17 @@ class AcceptInvitationView(APIView):
         ser.is_valid(raise_exception=True)
         from django.contrib.auth import get_user_model
         from django.db import transaction
-        with transaction.atomic():
-            user = get_user_model()(
-                username=inv.email, email=inv.email,
-                first_name=ser.validated_data["first_name"],
-                last_name=ser.validated_data.get("last_name", ""),
-                role=inv.role, organization=inv.organization, is_active=True)
-            user.set_password(ser.validated_data["password"])
-            user.save()
-            inv.status = Invitation.Status.ACCEPTED
-            inv.save(update_fields=["status"])
+        try:
+            with transaction.atomic():
+                user = get_user_model()(
+                    username=inv.email, email=inv.email,
+                    first_name=ser.validated_data["first_name"],
+                    last_name=ser.validated_data.get("last_name", ""),
+                    role=inv.role, organization=inv.organization, is_active=True)
+                user.set_password(ser.validated_data["password"])
+                user.save()
+                inv.status = Invitation.Status.ACCEPTED
+                inv.save(update_fields=["status"])
+        except IntegrityError:
+            return Response({"detail": "Ya existe una cuenta con ese email."}, status=409)
         return _login_response(user, {"ok": True})
