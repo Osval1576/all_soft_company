@@ -40,6 +40,16 @@ class UserSerializer(serializers.ModelSerializer):
                 if not others:
                     raise serializers.ValidationError(
                         "No podés dejar la organización sin un admin activo.")
+        # límite de agentes (billing): activar/convertir en agente sobre el tope
+        becomes_active_agent = (
+            attrs.get("role", inst.role if inst else None) == "AGENT"
+            and attrs.get("is_active", inst.is_active if inst else None) is True
+            and not (inst is not None and inst.role == "AGENT" and inst.is_active))
+        if inst is not None and becomes_active_agent:
+            from billing.services import can_add_agent
+            if not can_add_agent(inst.organization):
+                raise serializers.ValidationError(
+                    "Alcanzaste el límite de agentes de tu plan. Mejorá el plan para sumar más.")
         return attrs
 
 
