@@ -1,6 +1,8 @@
 from datetime import timedelta
+from io import StringIO
 from unittest import mock
 
+from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -214,3 +216,37 @@ class WebhookTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.sub.refresh_from_db()
         self.assertEqual(self.sub.plan.key, "business")
+
+
+class TrialExpiryTests(TestCase):
+    def setUp(self):
+        seed_plans()
+
+    def test_expira_trials_vencidos_a_free(self):
+        org = create_org("EXP")
+        sub = org.subscription
+        sub.plan = Plan.objects.get(key="pro"); sub.status = "trial"
+        sub.trial_ends_at = timezone.now() - timedelta(days=1); sub.save()
+        from billing.services import expire_trials
+        n = expire_trials()
+        sub.refresh_from_db()
+        self.assertEqual(sub.plan.key, "free")
+        self.assertEqual(sub.status, "active")
+        self.assertGreaterEqual(n, 1)
+
+    def test_no_toca_trials_vigentes_ni_pagas(self):
+        org = create_org("KEEP")
+        sub = org.subscription
+        sub.plan = Plan.objects.get(key="pro"); sub.status = "trial"
+        sub.trial_ends_at = timezone.now() + timedelta(days=5); sub.save()
+        from billing.services import expire_trials
+        expire_trials()
+        sub.refresh_from_db()
+        self.assertEqual(sub.plan.key, "pro")
+
+    @mock.patch("billing.management.commands.check_trials.time.sleep")
+    def test_command_loop_max_loops(self, sleep_mock):
+        out = StringIO()
+        call_command("check_trials", "--loop", "--max-loops=2", stdout=out)
+        self.assertEqual(out.getvalue().count("trials"), 2)
+        sleep_mock.assert_called_once()

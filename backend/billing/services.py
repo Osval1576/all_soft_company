@@ -17,3 +17,20 @@ def can_add_agent(org):
     if limit is None:
         return True
     return active_agent_count(org) < limit
+
+
+def expire_trials():
+    """Baja a Free los trials vencidos. Idempotente."""
+    from django.utils import timezone
+    from .models import Plan, Subscription
+    free = Plan.objects.filter(key="free").first()
+    if free is None:
+        return 0
+    qs = Subscription.objects.filter(status="trial", trial_ends_at__lt=timezone.now())
+    n = 0
+    for sub in qs:
+        sub.plan = free
+        sub.status = Subscription.Status.ACTIVE
+        sub.save(update_fields=["plan", "status"])
+        n += 1
+    return n
