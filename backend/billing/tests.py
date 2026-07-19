@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest import mock
 
 from django.test import TestCase
 from django.utils import timezone
@@ -91,3 +92,38 @@ class AgentLimitTests(TestCase):
                                              is_active=True).count(), 5)
         from billing.services import can_add_agent
         self.assertFalse(can_add_agent(self.org))
+
+
+class BillingEndpointsTests(TestCase):
+    def setUp(self):
+        seed_plans()
+        self.org = create_org("BEP")
+        self.admin = User.objects.create_user("bep_adm", email="bep@x.com", role="ADMIN",
+                                               organization=self.org)
+        self.c = APIClient(); self.c.force_authenticate(self.admin)
+
+    def test_subscription_get_devuelve_plan_uso_y_planes(self):
+        r = self.c.get("/api/billing/subscription/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("plan", r.data)
+        self.assertIn("agent_count", r.data)
+        self.assertIn("agent_limit", r.data)
+        self.assertEqual(len(r.data["plans"]), 3)
+
+    @mock.patch("billing.views.stripe_gateway.is_configured", return_value=False)
+    def test_checkout_sin_stripe_config_503(self, _):
+        r = self.c.post("/api/billing/checkout/", {"plan_key": "pro"}, format="json")
+        self.assertEqual(r.status_code, 503)
+
+    @mock.patch("billing.views.stripe_gateway.is_configured", return_value=True)
+    @mock.patch("billing.views.stripe_gateway.create_checkout_session",
+                return_value="https://checkout.stripe.test/abc")
+    def test_checkout_devuelve_url(self, mock_create, _):
+        r = self.c.post("/api/billing/checkout/", {"plan_key": "pro"}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data["url"], "https://checkout.stripe.test/abc")
+
+    def test_checkout_free_400(self):
+        with mock.patch("billing.views.stripe_gateway.is_configured", return_value=True):
+            r = self.c.post("/api/billing/checkout/", {"plan_key": "free"}, format="json")
+        self.assertEqual(r.status_code, 400)
