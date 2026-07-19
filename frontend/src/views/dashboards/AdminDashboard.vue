@@ -17,6 +17,7 @@
         <router-link to="/admin/sla" class="cms-link">SLA</router-link>
         <router-link to="/admin/metricas" class="cms-link">Métricas</router-link>
         <router-link to="/admin/miembros" class="cms-link">Miembros</router-link>
+        <router-link to="/admin/suscripcion" class="cms-link">Suscripción</router-link>
       </section>
 
       <div class="tab-content">

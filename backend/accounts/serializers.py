@@ -69,6 +69,17 @@ class InvitationCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Ya hay una invitación pendiente para ese email.")
         return value
 
+    def validate(self, attrs):
+        if attrs.get("role") == "AGENT":
+            from billing.services import can_add_agent
+            org = self.context["request"].organization
+            if not can_add_agent(org):
+                from billing.services import agent_limit
+                raise serializers.ValidationError(
+                    f"Alcanzaste el límite de agentes de tu plan ({agent_limit(org)}). "
+                    "Mejorá el plan para sumar más.")
+        return attrs
+
 
 class AcceptInvitationSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=30)

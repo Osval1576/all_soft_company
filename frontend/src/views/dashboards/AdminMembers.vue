@@ -42,6 +42,11 @@
 
         <section class="card">
           <h2 class="card-title">Invitaciones pendientes</h2>
+          <p class="agent-usage">Agentes: {{ sub?.agent_count ?? "—" }}/{{ agentLimitLabel }}</p>
+          <p v-if="agentLimitReached" class="warn-msg">
+            Llegaste al límite de agentes de tu plan.
+            <router-link to="/admin/suscripcion">Mejoralo para sumar más.</router-link>
+          </p>
           <form class="inv-add" @submit.prevent="onInvite">
             <input
               v-model="newInv.email"
@@ -54,7 +59,7 @@
               <option value="AGENT">Técnico</option>
               <option value="CUSTOMER">Cliente</option>
             </select>
-            <button type="submit" class="btn" :disabled="inviting">{{ inviting ? "Invitando…" : "Invitar" }}</button>
+            <button type="submit" class="btn" :disabled="inviting || inviteBlocked">{{ inviting ? "Invitando…" : "Invitar" }}</button>
           </form>
           <p v-if="inviteError" class="error-msg">{{ inviteError }}</p>
 
@@ -76,13 +81,14 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import AppTopBar from "../../components/AppTopBar.vue";
 import { useNotificationsStore } from "../../stores/notifications.store";
 import {
   listMembers, updateMember,
   listInvitations, createInvitation, revokeInvitation,
 } from "../../api/accounts.api";
+import { getSubscription } from "../../api/billing.api";
 
 const ROLE_LABELS = { AGENT: "Técnico", CUSTOMER: "Cliente" };
 
@@ -96,6 +102,13 @@ const inviting = ref(false);
 const inviteError = ref("");
 const confirmingId = ref(null);
 let confirmTimer = null;
+const sub = ref(null);
+
+const agentLimitLabel = computed(() => (sub.value?.agent_limit == null ? "∞" : sub.value.agent_limit));
+const agentLimitReached = computed(
+  () => sub.value?.agent_limit != null && sub.value.agent_count >= sub.value.agent_limit,
+);
+const inviteBlocked = computed(() => newInv.value.role === "AGENT" && agentLimitReached.value);
 
 function extractError(e, fallback) {
   const data = e?.response?.data;
@@ -186,6 +199,12 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
+  try {
+    sub.value = await getSubscription();
+  } catch (_) {
+    // el límite de agentes es informativo; si falla, el form queda habilitado
+    // y el backend igual valida al invitar.
+  }
 });
 
 onBeforeUnmount(() => {
@@ -218,6 +237,9 @@ onBeforeUnmount(() => {
 .btn:hover:not(:disabled) { background: var(--accent-hover); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .error-msg { padding: 9px 12px; border-radius: var(--r-sm); background: var(--c-urgent-bg); color: var(--c-urgent); font-size: 12px; margin-bottom: 10px; }
+.agent-usage { font-size: 13px; color: var(--text-2); margin-bottom: 8px; }
+.warn-msg { padding: 9px 12px; border-radius: var(--r-sm); background: var(--c-urgent-bg); color: var(--c-urgent); font-size: 12px; margin-bottom: 10px; }
+.warn-msg a { color: inherit; font-weight: 600; text-decoration: underline; }
 .inv-list { display: flex; flex-direction: column; gap: 4px; }
 .inv-list li { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 0.5px solid var(--border); font-size: 13px; color: var(--text); }
 .mono { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.5px; color: var(--text-2); }

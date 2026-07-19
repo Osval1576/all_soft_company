@@ -21,6 +21,7 @@ import AdminLocations from "../views/admin/site/AdminLocations.vue";
 import AdminSla from "../views/admin/sla/AdminSla.vue";
 import AdminMetrics from "../views/dashboards/AdminMetrics.vue";
 import AdminMembers from "../views/dashboards/AdminMembers.vue";
+import AdminSubscription from "../views/dashboards/AdminSubscription.vue";
 import NotificationSettings from "../views/settings/NotificationSettings.vue";
 
 import { useAuthStore } from "../stores/auth.store";
@@ -45,6 +46,7 @@ const routes = [
   { path: "/admin/sla", name: "admin-sla", component: AdminSla, meta: { role: "ADMIN" } },
   { path: "/admin/metricas", name: "admin-metricas", component: AdminMetrics, meta: { role: "ADMIN" } },
   { path: "/admin/miembros", name: "admin-miembros", component: AdminMembers, meta: { role: "ADMIN" } },
+  { path: "/admin/suscripcion", name: "admin-suscripcion", component: AdminSubscription, meta: { role: "ADMIN" } },
   { path: "/ajustes/notificaciones", name: "notif-settings", component: NotificationSettings, meta: { authed: true } },
   {
     path: "/admin/sitio",

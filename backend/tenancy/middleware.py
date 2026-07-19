@@ -8,7 +8,9 @@ class OrganizationMiddleware:
     - Org suspendida (is_active=False) -> 403.
     - Superuser de plataforma (org=None) pasa, pero con request.organization=None:
       los helpers de scoping devuelven vacio -> no ve datos de tenants por la API.
-    Exentos: /api/health/ y /api/auth/ (login/refresh/logout necesitan funcionar).
+    Exentos: /api/health/, /api/auth/ (login/refresh/logout necesitan funcionar)
+    y /api/billing/webhook/ (endpoint público firmado por Stripe, sin org: el resto
+    de /api/billing/ NO es exento).
 
     La API se autentica via JWT en cookie (config.authentication.CookieJWTAuthentication),
     no via sesion de Django: AuthenticationMiddleware pobla request.user desde la
@@ -21,7 +23,7 @@ class OrganizationMiddleware:
     tests, tambien sin pasar por sesion).
     """
 
-    EXEMPT_PREFIXES = ("/api/health/", "/api/auth/")
+    EXEMPT_PREFIXES = ("/api/health/", "/api/auth/", "/api/billing/webhook/")
 
     def __init__(self, get_response):
         self.get_response = get_response

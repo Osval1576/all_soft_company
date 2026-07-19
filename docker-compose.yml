@@ -57,6 +57,18 @@ services:
       web:
         condition: service_healthy
 
+  trial-scheduler:
+    build: ./backend
+    command: python manage.py check_trials --loop
+    env_file: .env
+    environment:
+      DB_HOST: mysql
+      REDIS_URL: redis://redis:6379/0
+      RUN_MIGRATIONS: "false"
+    depends_on:
+      web:
+        condition: service_healthy
+
   nginx:
     build: ./frontend
     ports:
