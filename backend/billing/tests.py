@@ -172,16 +172,45 @@ class WebhookTests(TestCase):
                         HTTP_STRIPE_SIGNATURE="mala")
         self.assertEqual(r.status_code, 400)
 
+    @mock.patch("billing.views._handle_event")
     @mock.patch("billing.views.stripe_gateway.verify_and_parse_webhook")
-    def test_idempotencia_mismo_event_id(self, mock_verify):
+    def test_idempotencia_mismo_event_id(self, mock_verify, mock_handle):
         self.sub.status = "active"; self.sub.stripe_subscription_id = "sub_999"; self.sub.save()
         ev = self._event("customer.subscription.deleted", {"id": "sub_999"}, eid="evt_dup")
         mock_verify.return_value = ev
         self.c.post("/api/billing/webhook/", data="{}", content_type="application/json",
                     HTTP_STRIPE_SIGNATURE="s")
-        self.sub.refresh_from_db(); self.sub.status = "active"; self.sub.save()  # simula re-cambio
         self.c.post("/api/billing/webhook/", data="{}", content_type="application/json",
-                    HTTP_STRIPE_SIGNATURE="s")  # re-entrega
-        # el 2do no re-procesa: la sub NO se re-toca (sigue active porque el evento ya se vio)
+                    HTTP_STRIPE_SIGNATURE="s")  # re-entrega del mismo event.id
+        # el handler real solo corre una vez pese a las 2 entregas
+        self.assertEqual(mock_handle.call_count, 1)
+
+    @mock.patch("billing.views.stripe_gateway.verify_and_parse_webhook")
+    def test_updated_past_due_no_reactiva(self, mock_verify):
+        self.sub.status = "active"; self.sub.stripe_subscription_id = "sub_999"; self.sub.save()
+        Plan.objects.filter(key="pro").update(stripe_price_id="price_pro")
+        mock_verify.return_value = self._event(
+            "customer.subscription.updated",
+            {"id": "sub_999", "status": "past_due",
+             "items": {"data": [{"price": {"id": "price_pro"}}]}},
+            eid="evt_pd")
+        r = self.c.post("/api/billing/webhook/", data="{}", content_type="application/json",
+                        HTTP_STRIPE_SIGNATURE="s")
+        self.assertEqual(r.status_code, 200)
         self.sub.refresh_from_db()
-        self.assertEqual(self.sub.status, "active")
+        self.assertEqual(self.sub.status, "past_due")
+
+    @mock.patch("billing.views.stripe_gateway.verify_and_parse_webhook")
+    def test_updated_aplica_plan_business(self, mock_verify):
+        self.sub.status = "active"; self.sub.stripe_subscription_id = "sub_999"; self.sub.save()
+        Plan.objects.filter(key="business").update(stripe_price_id="price_biz")
+        mock_verify.return_value = self._event(
+            "customer.subscription.updated",
+            {"id": "sub_999", "status": "active",
+             "items": {"data": [{"price": {"id": "price_biz"}}]}},
+            eid="evt_biz")
+        r = self.c.post("/api/billing/webhook/", data="{}", content_type="application/json",
+                        HTTP_STRIPE_SIGNATURE="s")
+        self.assertEqual(r.status_code, 200)
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.plan.key, "business")

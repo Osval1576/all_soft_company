@@ -1,5 +1,6 @@
 # backend/billing/views.py
 from django.conf import settings
+from django.db import IntegrityError, transaction
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -73,10 +74,12 @@ class WebhookView(APIView):
         except Exception:
             return Response({"detail": "Firma inválida."}, status=400)
         eid = event["id"] if isinstance(event, dict) else event.id
-        if ProcessedStripeEvent.objects.filter(event_id=eid).exists():
+        try:
+            with transaction.atomic():
+                ProcessedStripeEvent.objects.create(event_id=eid)
+        except IntegrityError:
             return Response({"ok": True})  # ya procesado (idempotencia)
         _handle_event(event)
-        ProcessedStripeEvent.objects.get_or_create(event_id=eid)
         return Response({"ok": True})
 
 
@@ -87,6 +90,25 @@ def _obj(event, key):
 
 def _etype(event):
     return event["type"] if isinstance(event, dict) else event.type
+
+
+_STRIPE_STATUS = {
+    "active": Subscription.Status.ACTIVE,
+    "trialing": Subscription.Status.TRIAL,
+    "past_due": Subscription.Status.PAST_DUE,
+    "unpaid": Subscription.Status.PAST_DUE,
+    "canceled": Subscription.Status.CANCELED,
+}
+
+
+def _plan_from_subscription_obj(event):
+    """customer.subscription.* trae items.data[0].price.id -> mapea a nuestro Plan."""
+    obj = event["data"]["object"] if isinstance(event, dict) else event.data.object
+    try:
+        price_id = obj["items"]["data"][0]["price"]["id"]
+    except (KeyError, IndexError, TypeError):
+        return None
+    return Plan.objects.filter(stripe_price_id=price_id).first()
 
 
 def _handle_event(event):
@@ -100,7 +122,8 @@ def _handle_event(event):
         sub.stripe_customer_id = _obj(event, "customer") or sub.stripe_customer_id
         sub.stripe_subscription_id = _obj(event, "subscription") or sub.stripe_subscription_id
         sub.save()
-    elif et in ("customer.subscription.updated", "customer.subscription.deleted"):
+    elif et in ("customer.subscription.created", "customer.subscription.updated",
+                "customer.subscription.deleted"):
         stripe_sub_id = _obj(event, "id")
         sub = Subscription.objects.filter(stripe_subscription_id=stripe_sub_id).first()
         if sub is None:
@@ -111,9 +134,15 @@ def _handle_event(event):
                 sub.plan = free
             sub.status = Subscription.Status.CANCELED
             sub.save()
-        else:
-            sub.status = Subscription.Status.ACTIVE
-            sub.save()
+            return
+        # created/updated: status y plan REALES del evento
+        mapped = _STRIPE_STATUS.get(_obj(event, "status"))
+        if mapped is not None:
+            sub.status = mapped
+        plan = _plan_from_subscription_obj(event)
+        if plan is not None and mapped != Subscription.Status.CANCELED:
+            sub.plan = plan
+        sub.save()
     elif et == "invoice.payment_failed":
         stripe_sub_id = _obj(event, "subscription")
         sub = Subscription.objects.filter(stripe_subscription_id=stripe_sub_id).first()
