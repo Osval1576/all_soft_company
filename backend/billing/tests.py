@@ -127,3 +127,61 @@ class BillingEndpointsTests(TestCase):
         with mock.patch("billing.views.stripe_gateway.is_configured", return_value=True):
             r = self.c.post("/api/billing/checkout/", {"plan_key": "free"}, format="json")
         self.assertEqual(r.status_code, 400)
+
+
+class WebhookTests(TestCase):
+    def setUp(self):
+        seed_plans()
+        self.org = create_org("WHK")
+        self.sub = self.org.subscription
+        self.sub.plan = Plan.objects.get(key="pro"); self.sub.status = "trial"
+        self.sub.stripe_customer_id = "cus_123"; self.sub.save()
+        self.c = APIClient()
+
+    def _event(self, etype, data, eid="evt_1"):
+        return {"id": eid, "type": etype, "data": {"object": data}}
+
+    @mock.patch("billing.views.stripe_gateway.verify_and_parse_webhook")
+    def test_checkout_completed_activa(self, mock_verify):
+        Plan.objects.filter(key="pro").update(stripe_price_id="price_pro")
+        mock_verify.return_value = self._event(
+            "checkout.session.completed",
+            {"client_reference_id": str(self.org.id), "customer": "cus_123",
+             "subscription": "sub_999"})
+        r = self.c.post("/api/billing/webhook/", data="{}", content_type="application/json",
+                        HTTP_STRIPE_SIGNATURE="t=1,v1=x")
+        self.assertEqual(r.status_code, 200)
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.status, "active")
+        self.assertEqual(self.sub.stripe_subscription_id, "sub_999")
+
+    @mock.patch("billing.views.stripe_gateway.verify_and_parse_webhook")
+    def test_subscription_deleted_baja_a_free(self, mock_verify):
+        self.sub.status = "active"; self.sub.stripe_subscription_id = "sub_999"; self.sub.save()
+        mock_verify.return_value = self._event(
+            "customer.subscription.deleted", {"id": "sub_999"}, eid="evt_2")
+        self.c.post("/api/billing/webhook/", data="{}", content_type="application/json",
+                    HTTP_STRIPE_SIGNATURE="sig")
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.plan.key, "free")
+
+    @mock.patch("billing.views.stripe_gateway.verify_and_parse_webhook",
+                side_effect=ValueError("bad sig"))
+    def test_firma_invalida_400(self, _):
+        r = self.c.post("/api/billing/webhook/", data="{}", content_type="application/json",
+                        HTTP_STRIPE_SIGNATURE="mala")
+        self.assertEqual(r.status_code, 400)
+
+    @mock.patch("billing.views.stripe_gateway.verify_and_parse_webhook")
+    def test_idempotencia_mismo_event_id(self, mock_verify):
+        self.sub.status = "active"; self.sub.stripe_subscription_id = "sub_999"; self.sub.save()
+        ev = self._event("customer.subscription.deleted", {"id": "sub_999"}, eid="evt_dup")
+        mock_verify.return_value = ev
+        self.c.post("/api/billing/webhook/", data="{}", content_type="application/json",
+                    HTTP_STRIPE_SIGNATURE="s")
+        self.sub.refresh_from_db(); self.sub.status = "active"; self.sub.save()  # simula re-cambio
+        self.c.post("/api/billing/webhook/", data="{}", content_type="application/json",
+                    HTTP_STRIPE_SIGNATURE="s")  # re-entrega
+        # el 2do no re-procesa: la sub NO se re-toca (sigue active porque el evento ya se vio)
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.status, "active")
