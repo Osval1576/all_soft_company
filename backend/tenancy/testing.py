@@ -19,4 +19,9 @@ def create_org(slug="TST", name=None):
         SlaPolicy.objects.get_or_create(
             organization=org, priority=prio,
             defaults={"first_response_minutes": fr, "resolution_minutes": res})
+    try:
+        from billing.testing import provision_test_org
+        provision_test_org(org)
+    except ImportError:
+        pass
     return org

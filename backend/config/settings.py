@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "tenancy",
     "accounts",
+    "billing",
     "users",
     "tickets_t",
     "notifications",
@@ -146,6 +147,11 @@ USE_TZ = True
 
 # H2: base pública del frontend (links de verificación/invitación por email)
 FRONTEND_BASE_URL = _env("FRONTEND_BASE_URL", "http://localhost:5173")
+
+# H3: billing / Stripe (usado en T3-T4)
+STRIPE_SECRET_KEY = _env("STRIPE_SECRET_KEY")
+STRIPE_WEBHOOK_SECRET = _env("STRIPE_WEBHOOK_SECRET")
+STRIPE_PUBLISHABLE_KEY = _env("STRIPE_PUBLISHABLE_KEY")
 
 # Static files
 STATIC_URL = "static/"
