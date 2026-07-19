@@ -117,6 +117,12 @@ class AcceptInvitationView(APIView):
         from django.db import transaction
         try:
             with transaction.atomic():
+                if inv.role == "AGENT":
+                    from billing.services import can_add_agent
+                    if not can_add_agent(inv.organization):
+                        return Response(
+                            {"detail": "La organización alcanzó el límite de agentes de su plan."},
+                            status=409)
                 user = get_user_model()(
                     username=inv.email, email=inv.email,
                     first_name=ser.validated_data["first_name"],
