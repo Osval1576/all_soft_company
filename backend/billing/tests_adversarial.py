@@ -15,7 +15,7 @@ from rest_framework.test import APIClient
 
 from tenancy.testing import create_org
 from billing.testing import seed_plans
-from billing.models import Subscription
+from billing.models import Plan, ProcessedStripeEvent, Subscription
 
 User = get_user_model()
 
@@ -30,12 +30,38 @@ class BillingAdversarialTests(TestCase):
         self.c = APIClient(); self.c.force_authenticate(self.admin_a)
 
     def test_admin_solo_ve_su_subscription(self):
+        # org_a y org_b deben quedar en estados DISTINGUIBLES (plan + agent_count
+        # distintos); si no, un leak cross-org pasaria desapercibido porque ambas
+        # respuestas se verian iguales.
+        sub_a = self.org_a.subscription
+        sub_a.plan = Plan.objects.get(key="free")
+        sub_a.status = Subscription.Status.ACTIVE
+        sub_a.save()
+        User.objects.create_user("baa_ag1", email="baa_ag1@x.com", role="AGENT",
+                                 organization=self.org_a, is_active=True)
+
+        # org_b se queda en Business (provision_test_org) con 3 agentes activos
+        User.objects.create_user("bab_ag1", email="bab_ag1@x.com", role="AGENT",
+                                 organization=self.org_b, is_active=True)
+        User.objects.create_user("bab_ag2", email="bab_ag2@x.com", role="AGENT",
+                                 organization=self.org_b, is_active=True)
+        User.objects.create_user("bab_ag3", email="bab_ag3@x.com", role="AGENT",
+                                 organization=self.org_b, is_active=True)
+
         r = self.c.get("/api/billing/subscription/")
         self.assertEqual(r.status_code, 200)
-        # el plan/uso son de A; no hay forma de pedir la sub de B por la API
-        self.assertEqual(r.data["agent_count"], 0)
-        self.assertEqual(r.data["plan"], self.org_a.subscription.effective_plan.key)
-        # la sub de B (otra org) queda intacta y no aparece en la respuesta
+
+        # la respuesta refleja el estado de A...
+        self.assertEqual(r.data["plan"], "free")
+        self.assertEqual(r.data["agent_limit"], 2)
+        self.assertEqual(r.data["agent_count"], 1)
+
+        # ...y NO el de B (que tiene plan/uso claramente distintos)
+        self.assertNotEqual(r.data["agent_count"], 3)
+        self.assertNotEqual(r.data["agent_limit"], None)
+        self.assertNotEqual(r.data["plan"], "business")
+
+        # la sub de B (otra org) es una fila distinta en la BD
         self.assertNotEqual(self.org_b.subscription.id, self.org_a.subscription.id)
 
     def test_no_admin_no_hace_checkout(self):
@@ -57,6 +83,7 @@ class BillingAdversarialTests(TestCase):
                              content_type="application/json")
         self.assertEqual(r.status_code, 400)
         self.assertEqual(Subscription.objects.get(organization=self.org_a).status, before)
+        self.assertEqual(ProcessedStripeEvent.objects.count(), 0)
 
     def test_front_no_puede_autoactivar_plan(self):
         # no existe ningun endpoint que setee status=active sin pasar por el
