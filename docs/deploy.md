@@ -159,6 +159,7 @@ Correr esta lista completa después de cada deploy a producción (primer deploy 
 - [ ] **Login por el dominio**: entrar a `https://allsafe.example.com`, loguearse con un usuario real y confirmar que el dashboard carga.
 - [ ] **WS de chat conecta**: abrir un ticket con chat y verificar que el badge de estado marca "conectado" (no queda en reconexión/desconectado).
 - [ ] **Upload + download de adjunto**: subir un archivo a un ticket y volver a descargarlo — confirma que el volumen `media_volume` y el servido autenticado por Django funcionan.
+- [ ] **Logo de branding persiste**: en una org de plan pago, subir un logo en `/admin/branding` y confirmar que se muestra tras recargar. Los logos viven en `MEDIA_ROOT/branding/logos/` (mismo `media_volume` que los adjuntos, servido por nginx bajo `/media/`); el volumen debe persistir entre deploys o los logos se pierden.
 - [ ] **Notificaciones entre 2 sesiones** (prueba real de Redis pub/sub entre workers): ver el bloque de verificación Redis abajo.
 - [ ] **`/django-admin/` accesible**: entrar a `https://allsafe.example.com/django-admin/` con el superusuario creado en el paso 2 y confirmar que carga el admin de Django con sus estáticos (CSS) bien servidos.
 
