@@ -1,10 +1,10 @@
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from tickets_t.permissions import IsAdmin
-from .branding_serializers import BrandingSerializer
+from .branding_serializers import BrandingSerializer, branding_payload
 from .branding_services import branding_enabled
 from .models import OrganizationBranding
 
@@ -33,3 +33,17 @@ class BrandingView(APIView):
         ser.is_valid(raise_exception=True)
         ser.save()
         return Response(ser.data)
+
+
+class PublicBrandingView(APIView):
+    """Superficie pública mínima por slug. 404 si la org no existe, está inactiva,
+    o no tiene plan pago: nunca revela datos sensibles ni la existencia del tenant."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        from .models import Organization
+        org = Organization.objects.filter(slug=slug.upper(), is_active=True).first()
+        payload = branding_payload(org, request) if org else None
+        if payload is None:
+            return Response({"detail": "No encontrado."}, status=404)
+        return Response(payload)

@@ -22,6 +22,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import me, health
 from .auth_views import LoginCookieView, RefreshCookieView, LogoutView
 from landing_cms.admin_views import SiteSettingsAdminView
+from tenancy.branding_views import PublicBrandingView
 
 v_settings_admin = SiteSettingsAdminView.as_view()
 
@@ -47,6 +48,7 @@ urlpatterns = [
     path("api/metrics/", include("metrics.urls")),
     path("api/billing/", include("billing.urls")),
     path("api/branding/", include("tenancy.branding_urls")),
+    path("api/public/branding/<str:slug>/", PublicBrandingView.as_view(), name="public-branding"),
     path("api/auth/login-cookie/", LoginCookieView.as_view(), name="login_cookie"),
     path("api/auth/refresh-cookie/", RefreshCookieView.as_view(), name="refresh_cookie"),
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),

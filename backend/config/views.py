@@ -7,7 +7,9 @@ from rest_framework.response import Response
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me(request):
+    from tenancy.branding_serializers import branding_payload
     u = request.user
+    org = u.organization if u.organization_id else None
     return Response(
         {
             "id": u.id,
@@ -16,7 +18,8 @@ def me(request):
             "is_staff": u.is_staff,
             "is_superuser": u.is_superuser,
             "role": u.role,
-            "organization": u.organization.name if u.organization_id else None,
+            "organization": org.name if org else None,
+            "branding": branding_payload(org, request) if org else None,
         }
     )
 

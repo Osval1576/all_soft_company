@@ -101,3 +101,46 @@ class BrandingAdminApiTests(TestCase):
         c = APIClient(); c.force_authenticate(agent)
         r = c.put("/api/branding/", {"accent_color": "#123456"}, format="json")
         self.assertEqual(r.status_code, 403)
+
+
+class BrandingPublicApiTests(TestCase):
+    def setUp(self):
+        self.org = create_org("BRP", name="Public Co")  # Business (pago)
+        from tenancy.models import OrganizationBranding
+        OrganizationBranding.objects.create(
+            organization=self.org, display_name="Public Support", accent_color="#ABCDEF")
+
+    def test_public_returns_minimal_branding_for_paid_org(self):
+        r = APIClient().get(f"/api/public/branding/{self.org.slug}/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(set(r.data.keys()),
+                         {"display_name", "accent_color", "logo_url", "default_dark"})
+        self.assertEqual(r.data["display_name"], "Public Support")
+        self.assertEqual(r.data["accent_color"], "#ABCDEF")
+
+    def test_public_404_for_unknown_slug(self):
+        r = APIClient().get("/api/public/branding/NOPE/")
+        self.assertEqual(r.status_code, 404)
+
+    def test_public_404_for_free_org(self):
+        sub = self.org.subscription
+        sub.plan = Plan.objects.get(key="free")
+        sub.status = Subscription.Status.ACTIVE
+        sub.save()
+        r = APIClient().get(f"/api/public/branding/{self.org.slug}/")
+        self.assertEqual(r.status_code, 404)
+
+    def test_public_404_for_inactive_org(self):
+        self.org.is_active = False
+        self.org.save()
+        r = APIClient().get(f"/api/public/branding/{self.org.slug}/")
+        self.assertEqual(r.status_code, 404)
+
+    def test_me_includes_branding(self):
+        admin = User.objects.create_user("brp_admin", email="a@x.com",
+                                         role="ADMIN", organization=self.org)
+        c = APIClient(); c.force_authenticate(admin)
+        r = c.get("/api/me/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIsNotNone(r.data["branding"])
+        self.assertEqual(r.data["branding"]["accent_color"], "#ABCDEF")
