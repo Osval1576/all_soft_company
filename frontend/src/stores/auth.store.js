@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { http } from "../api/http";
 import router from "../router";
+import { applyBranding, clearBranding } from "../composables/useBranding";
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -13,6 +14,7 @@ export const useAuthStore = defineStore("auth", {
   try {
     const res = await http.get("/api/me/");
     this.user = res.data;
+    applyBranding(res.data?.branding);
   } catch (e) {
     this.user = null;   // importante
   } finally {
@@ -39,6 +41,7 @@ redirectByRole() {
       } finally {
         this.user = null;
         this.loaded = true;
+        clearBranding();
         router.push({ name: "login" });
       }
     },

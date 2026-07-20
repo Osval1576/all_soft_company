@@ -2,8 +2,9 @@
   <header class="topbar">
     <div class="topbar-left">
       <div class="brand">
-        <span class="brand-mark">AS</span>
-        <span class="brand-name">AllSafe</span>
+        <img v-if="brandLogo" :src="brandLogo" alt="" class="brand-logo" />
+        <span v-else class="brand-mark">AS</span>
+        <span class="brand-name">{{ brandName }}</span>
       </div>
       <template v-if="title">
         <span class="sep">›</span>
@@ -45,6 +46,9 @@ const roleLabel = computed(() => {
   if (auth.user?.role === 'AGENT') return 'Técnico'
   return 'Cliente'
 })
+
+const brandLogo = computed(() => auth.user?.branding?.logo_url || null)
+const brandName = computed(() => auth.user?.branding?.display_name || 'AllSafe')
 </script>
 
 <style scoped>
@@ -75,6 +79,7 @@ const roleLabel = computed(() => {
   letter-spacing: .5px;
 }
 .brand-name { font-weight: 700; font-size: 15px; color: var(--text); }
+.brand-logo { height: 24px; width: auto; max-width: 120px; object-fit: contain; display: block; }
 .sep { color: var(--text-3); font-size: 18px; line-height: 1; }
 .page-title { color: var(--text-2); font-size: 14px; font-weight: 500; font-family: var(--font-display); letter-spacing: -0.01em; }
 .topbar-right { display: flex; align-items: center; gap: 10px; }
