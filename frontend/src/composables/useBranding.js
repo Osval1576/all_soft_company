@@ -3,8 +3,14 @@
 // consume var(--accent) y derivados. Los tokens neutros NO se tocan.
 const ACCENT_VARS = ['--accent', '--accent-hover', '--accent-2', '--accent-light', '--accent-glow']
 
+const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/
+
 export function applyBranding(branding) {
   if (!branding || !branding.accent_color) {
+    clearBranding()
+    return
+  }
+  if (!HEX_COLOR_RE.test(branding.accent_color)) {
     clearBranding()
     return
   }

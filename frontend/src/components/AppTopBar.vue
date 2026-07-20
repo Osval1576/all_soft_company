@@ -2,7 +2,7 @@
   <header class="topbar">
     <div class="topbar-left">
       <div class="brand">
-        <img v-if="brandLogo" :src="brandLogo" alt="" class="brand-logo" />
+        <img v-if="brandLogo" :src="brandLogo" :alt="brandName" class="brand-logo" />
         <span v-else class="brand-mark">AS</span>
         <span class="brand-name">{{ brandName }}</span>
       </div>

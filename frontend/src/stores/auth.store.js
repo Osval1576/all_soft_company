@@ -17,6 +17,7 @@ export const useAuthStore = defineStore("auth", {
     applyBranding(res.data?.branding);
   } catch (e) {
     this.user = null;   // importante
+    clearBranding();
   } finally {
     this.loaded = true; // importante
   }
