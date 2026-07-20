@@ -125,7 +125,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (!auth.user) clearBranding();
+  if (auth.user) applyBranding(auth.user.branding);
+  else clearBranding();
 });
 
 async function onSubmit() {
