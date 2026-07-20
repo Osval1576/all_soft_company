@@ -46,6 +46,7 @@ urlpatterns = [
     path("api/csat/", include("csat.urls")),
     path("api/metrics/", include("metrics.urls")),
     path("api/billing/", include("billing.urls")),
+    path("api/branding/", include("tenancy.branding_urls")),
     path("api/auth/login-cookie/", LoginCookieView.as_view(), name="login_cookie"),
     path("api/auth/refresh-cookie/", RefreshCookieView.as_view(), name="refresh_cookie"),
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),
