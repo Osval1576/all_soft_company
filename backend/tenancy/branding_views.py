@@ -27,7 +27,7 @@ class BrandingView(APIView):
             return Response(
                 {"detail": "El branding es una función de los planes Pro y Business."},
                 status=403)
-        branding, _ = OrganizationBranding.objects.get_or_create(organization=org)
+        branding = getattr(org, "branding", None) or OrganizationBranding(organization=org)
         ser = BrandingSerializer(branding, data=request.data, partial=True,
                                  context={"request": request, "organization": org})
         ser.is_valid(raise_exception=True)

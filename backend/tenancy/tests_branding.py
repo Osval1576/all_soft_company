@@ -68,6 +68,25 @@ class BrandingAdminApiTests(TestCase):
         r = self.c.put("/api/branding/", {"accent_color": "red"}, format="json")
         self.assertEqual(r.status_code, 400)
 
+    def test_put_bad_color_does_not_persist_row(self):
+        r = self.c.put("/api/branding/", {"accent_color": "red"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(OrganizationBranding.objects.count(), 0)
+
+    def test_put_accepts_png_logo(self):
+        r = self.c.put("/api/branding/", {"logo": _png_bytes()}, format="multipart")
+        self.assertEqual(r.status_code, 200)
+        self.assertIsNotNone(r.data["logo_url"])
+
+    def test_put_rejects_non_allowed_format(self):
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.new("RGB", (4, 4)).save(buf, format="GIF")
+        buf.seek(0)
+        buf.name = "logo.gif"
+        r = self.c.put("/api/branding/", {"logo": buf}, format="multipart")
+        self.assertEqual(r.status_code, 400)
+
     def test_free_plan_cannot_edit(self):
         sub = self.org.subscription
         sub.plan = Plan.objects.get(key="free")
