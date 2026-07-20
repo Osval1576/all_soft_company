@@ -124,7 +124,9 @@ onMounted(async () => {
   }
 });
 
-onUnmounted(() => clearBranding());
+onUnmounted(() => {
+  if (!auth.user) clearBranding();
+});
 
 async function onSubmit() {
   if (!firstName.value || !password.value) return;

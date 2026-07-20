@@ -8,8 +8,10 @@ import { useRoute } from "vue-router";
 import LoginView from "../LoginView.vue";
 import { getPublicBranding } from "../../api/branding.api";
 import { applyBranding, clearBranding } from "../../composables/useBranding";
+import { useAuthStore } from "../../stores/auth.store";
 
 const route = useRoute();
+const auth = useAuthStore();
 const brandName = ref("AllSafe");
 const brandLogo = ref(null);
 
@@ -22,5 +24,7 @@ onMounted(async () => {
   } catch (e) { /* 404 -> marca producto */ }
 });
 
-onUnmounted(() => clearBranding());
+onUnmounted(() => {
+  if (!auth.user) clearBranding();
+});
 </script>
