@@ -71,9 +71,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { getInvitation, acceptInvitation } from "../../api/accounts.api";
+import { getPublicBranding } from "../../api/branding.api";
+import { applyBranding, clearBranding } from "../../composables/useBranding";
 import { useAuthStore } from "../../stores/auth.store";
 
 const route = useRoute();
@@ -106,6 +108,13 @@ function extractError(e) {
 }
 
 onMounted(async () => {
+  if (route.params.slug) {
+    try {
+      const b = await getPublicBranding(route.params.slug);
+      applyBranding(b);
+    } catch (e) { /* sin branding */ }
+  }
+
   try {
     invitation.value = await getInvitation(route.params.token);
     status.value = "ready";
@@ -114,6 +123,8 @@ onMounted(async () => {
     status.value = "error";
   }
 });
+
+onUnmounted(() => clearBranding());
 
 async function onSubmit() {
   if (!firstName.value || !password.value) return;

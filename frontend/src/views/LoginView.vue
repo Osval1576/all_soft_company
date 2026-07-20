@@ -2,6 +2,10 @@
   <div class="login-page">
     <div class="login-inner">
       <div class="side">
+        <div v-if="brandLogo || brandName !== 'AllSafe'" class="brand-mark">
+          <img v-if="brandLogo" :src="brandLogo" :alt="brandName" class="brand-logo" />
+          <span class="brand-name">{{ brandName }}</span>
+        </div>
         <p class="eyebrow">Acceso privado</p>
         <h1 class="lead">
           Bienvenido<br />
@@ -52,6 +56,11 @@
 <script setup>
 import { ref } from "vue";
 import { useAuthStore } from "../stores/auth.store";
+
+defineProps({
+  brandName: { type: String, default: "AllSafe" },
+  brandLogo: { type: String, default: null },
+});
 
 const auth = useAuthStore();
 const username = ref("");
@@ -110,6 +119,25 @@ async function onSubmit() {
   grid-template-columns: 1fr 1fr;
   gap: 72px;
   align-items: center;
+}
+
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 20px;
+}
+.brand-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+.brand-name {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--text);
 }
 
 .eyebrow {

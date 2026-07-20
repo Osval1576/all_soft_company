@@ -8,6 +8,7 @@ import LandingHome from "../views/public/LandingHome.vue";
 import RegisterView from "../views/public/RegisterView.vue";
 import VerifyEmailView from "../views/public/VerifyEmailView.vue";
 import AcceptInvitationView from "../views/public/AcceptInvitationView.vue";
+import OrgLoginView from "../views/public/OrgLoginView.vue";
 
 import ClientDashboard from "../views/dashboards/ClientDashboard.vue";
 import TechnicianDashboard from "../views/dashboards/TechnicianDashboard.vue";
@@ -37,6 +38,8 @@ const routes = [
       { path: "registro", name: "registro", component: RegisterView, meta: { public: true } },
       { path: "verificar/:token", name: "verificar", component: VerifyEmailView, meta: { public: true } },
       { path: "invitacion/:token", name: "invitacion", component: AcceptInvitationView, meta: { public: true } },
+      { path: "o/:slug/login", name: "org-login", component: OrgLoginView, meta: { public: true } },
+      { path: "o/:slug/invitacion/:token", name: "org-invitacion", component: AcceptInvitationView, meta: { public: true } },
     ],
   },
   { path: "/cliente", name: "cliente", component: ClientDashboard, meta: { role: "CUSTOMER" } },
