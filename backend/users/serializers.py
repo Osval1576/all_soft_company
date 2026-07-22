@@ -51,29 +51,3 @@ class UserSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "Alcanzaste el límite de agentes de tu plan. Mejorá el plan para sumar más.")
         return attrs
-
-
-class UserCreateSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=8)
-
-    class Meta:
-        model = User
-        fields = [
-            "id",
-            "username",
-            "email",
-            "first_name",
-            "last_name",
-            "role",
-            "password",
-            "is_active",
-            "is_staff",
-        ]
-        read_only_fields = ["id"]
-
-    def create(self, validated_data):
-        password = validated_data.pop("password")
-        user = User(**validated_data)
-        user.set_password(password)
-        user.save()
-        return user
