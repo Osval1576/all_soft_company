@@ -1,3 +1,5 @@
+import { applyDefaultTheme } from './useTheme'
+
 // Sobreescribe en runtime las CSS custom properties del acento a partir del
 // branding de la org. Un único punto de inyección: el resto de componentes ya
 // consume var(--accent) y derivados. Los tokens neutros NO se tocan.
@@ -6,21 +8,21 @@ const ACCENT_VARS = ['--accent', '--accent-hover', '--accent-2', '--accent-light
 const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/
 
 export function applyBranding(branding) {
-  if (!branding || !branding.accent_color) {
+  if (!branding || !HEX_COLOR_RE.test(branding.accent_color || '')) {
     clearBranding()
-    return
+  } else {
+    const c = branding.accent_color
+    const root = document.documentElement.style
+    root.setProperty('--accent', c)
+    root.setProperty('--accent-hover', `color-mix(in srgb, ${c}, black 18%)`)
+    root.setProperty('--accent-2', c)
+    root.setProperty('--accent-light', `color-mix(in srgb, ${c} 8%, transparent)`)
+    root.setProperty('--accent-glow', `color-mix(in srgb, ${c} 35%, transparent)`)
   }
-  if (!HEX_COLOR_RE.test(branding.accent_color)) {
-    clearBranding()
-    return
+  // Tema oscuro por defecto de la org: sólo si el usuario no eligió tema.
+  if (branding && branding.default_dark) {
+    applyDefaultTheme(true)
   }
-  const c = branding.accent_color
-  const root = document.documentElement.style
-  root.setProperty('--accent', c)
-  root.setProperty('--accent-hover', `color-mix(in srgb, ${c}, black 18%)`)
-  root.setProperty('--accent-2', c)
-  root.setProperty('--accent-light', `color-mix(in srgb, ${c} 8%, transparent)`)
-  root.setProperty('--accent-glow', `color-mix(in srgb, ${c} 35%, transparent)`)
 }
 
 export function clearBranding() {
