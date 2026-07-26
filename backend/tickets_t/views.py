@@ -209,9 +209,15 @@ class TicketViewSet(viewsets.ModelViewSet):
         msg = TicketMessage.objects.filter(pk=message_id, ticket=ticket).first()
         if msg is None or not msg.attachment:
             return Response({"detail": "Adjunto no encontrado."}, status=404)
+        # as_attachment + filename hacen que Django arme el Content-Disposition de
+        # forma segura (RFC 6266, filename* codificado): evita romper/inyectar el
+        # header con comillas o caracteres especiales en el nombre subido (CN-007).
+        # nota: X-Content-Type-Options: nosniff ya lo agrega SecurityMiddleware
+        # (SECURE_CONTENT_TYPE_NOSNIFF) para toda respuesta, cubriendo CN-011.
         resp = FileResponse(
             msg.attachment.open("rb"),
+            as_attachment=True,
+            filename=msg.attachment_name or "adjunto",
             content_type=msg.attachment_content_type or "application/octet-stream",
         )
-        resp["Content-Disposition"] = f'attachment; filename="{msg.attachment_name}"'
         return resp

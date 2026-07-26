@@ -7,6 +7,8 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
+        # is_staff/is_superuser son flags de plataforma; no se exponen por la API
+        # in-app (info disclosure innecesaria) y el frontend no los usa (CN-009).
         fields = [
             "id",
             "username",
@@ -15,11 +17,9 @@ class UserSerializer(serializers.ModelSerializer):
             "last_name",
             "role",
             "is_active",
-            "is_staff",
-            "is_superuser",
             "date_joined",
         ]
-        read_only_fields = ["id", "is_staff", "is_superuser", "date_joined"]
+        read_only_fields = ["id", "date_joined"]
 
     def validate(self, attrs):
         request = self.context.get("request")

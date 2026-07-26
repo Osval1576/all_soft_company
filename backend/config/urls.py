@@ -19,7 +19,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import me, health
+from .views import me, health, csrf
 from .auth_views import (
     LoginCookieView, RefreshCookieView, LogoutView, ThrottledTokenObtainPairView,
 )
@@ -54,6 +54,7 @@ urlpatterns = [
     path("api/auth/login-cookie/", LoginCookieView.as_view(), name="login_cookie"),
     path("api/auth/refresh-cookie/", RefreshCookieView.as_view(), name="refresh_cookie"),
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),
+    path("api/auth/csrf/", csrf, name="csrf"),
 ]
 
 if settings.DEBUG:
