@@ -34,6 +34,40 @@ class _AdminAuthMixin:
         c.force_authenticate(user=u)
         return c
 
+    def _tenant_admin_client(self):
+        # ADMIN de un tenant (NO staff de plataforma): el CMS público es global,
+        # así que este usuario NO debe poder editarlo (CN-001).
+        from tenancy.testing import create_org
+        u = User.objects.create_user(username="tadm", password="x", role="ADMIN",
+                                     organization=create_org("LCM2"))
+        c = APIClient()
+        c.force_authenticate(user=u)
+        return c
+
+
+class LandingCmsIsolationTests(TestCase, _AdminAuthMixin):
+    """CN-001: solo staff de plataforma edita el CMS público global."""
+
+    def test_tenant_admin_cannot_read_singleton(self):
+        r = self._tenant_admin_client().get("/api/admin/landing/hero/")
+        self.assertEqual(r.status_code, 403)
+
+    def test_tenant_admin_cannot_write_singleton(self):
+        r = self._tenant_admin_client().put(
+            "/api/admin/landing/hero/", {"title_es": "Hack"}, format="json")
+        self.assertEqual(r.status_code, 403)
+
+    def test_tenant_admin_cannot_create_feature(self):
+        r = self._tenant_admin_client().post("/api/admin/landing/features/", {
+            "icon": "x", "title_es": "A", "title_en": "A", "order": 0,
+            "description_es": "", "description_en": "", "is_active": True,
+        }, format="json")
+        self.assertEqual(r.status_code, 403)
+
+    def test_platform_staff_still_allowed(self):
+        r = self._admin_client().get("/api/admin/landing/hero/")
+        self.assertEqual(r.status_code, 200)
+
 
 class HeroAdminTests(TestCase, _AdminAuthMixin):
     def test_get_ok(self):

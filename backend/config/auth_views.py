@@ -4,7 +4,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 
 COOKIE_ACCESS_NAME = "access"
@@ -20,12 +22,21 @@ def cookie_settings():
         "path": "/",
     }
 
+class ThrottledTokenObtainPairView(TokenObtainPairView):
+    """/api/auth/login/ con rate-limit por IP (CN-003)."""
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
+
+
 class LoginCookieView(APIView):
     permission_classes = [AllowAny]
     # No autenticar por la cookie `access`: este endpoint valida por
     # usuario/contraseña. Si el navegador manda un access vencido de una sesión
     # previa, no debe impedir re-loguearse.
     authentication_classes = []
+    # CN-003: rate-limit por IP contra fuerza bruta de credenciales.
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
 
     def post(self, request):
         serializer = TokenObtainPairSerializer(data=request.data)
