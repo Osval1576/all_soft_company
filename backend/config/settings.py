@@ -33,6 +33,11 @@ ALLOWED_HOSTS = _env_csv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost")
 
 # Application definition
 INSTALLED_APPS = [
+    # daphne debe ir primero: reemplaza el runserver WSGI por el servidor ASGI
+    # de Daphne, para que `manage.py runserver` sirva WebSockets en desarrollo
+    # (con auto-reload). En prod el ASGI lo sirve daphne directo (deploy G).
+    "daphne",
+
     # Django apps
     "django.contrib.admin",
     "django.contrib.auth",

@@ -9,3 +9,10 @@ export const http = axios.create({
   baseURL: base,
   withCredentials: true,
 });
+
+// Host para WebSockets, derivado del mismo origen que la API: en dev apunta al
+// backend (:8000, distinto puerto que Vite), en prod (base="") queda
+// same-origin detrás de Nginx. Se puede forzar con VITE_WS_HOST.
+export function wsHost() {
+  return import.meta.env.VITE_WS_HOST || (base ? new URL(base).host : window.location.host);
+}

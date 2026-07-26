@@ -4,6 +4,7 @@ import {
   markRead as apiMarkRead,
   markAllRead as apiMarkAllRead,
 } from "../api/notifications.api";
+import { wsHost } from "../api/http";
 
 const BACKOFFS_MS = [1000, 2000, 4000, 8000, 16000];
 
@@ -41,10 +42,9 @@ export const useNotificationsStore = defineStore("notifications", {
       if (socket && socket.readyState !== WebSocket.CLOSED) return;
       closedByUser = false;
       const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const host = import.meta.env.VITE_WS_HOST || window.location.host;
       let s;
       try {
-        s = new WebSocket(`${proto}//${host}/ws/notify/`);
+        s = new WebSocket(`${proto}//${wsHost()}/ws/notify/`);
       } catch (_) {
         this._scheduleRetry();
         return;

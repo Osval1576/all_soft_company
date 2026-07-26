@@ -102,6 +102,7 @@
 <script setup>
 import { nextTick, ref, watch, computed, onBeforeUnmount } from "vue";
 import { getTicketMessages, getTicketEvents, uploadAttachment } from "../api/tickets.api";
+import { wsHost } from "../api/http";
 import { useAuthStore } from "../stores/auth.store";
 import { useNotificationsStore } from "../stores/notifications.store";
 import { useWsConnection } from "../composables/useWsConnection";
@@ -176,8 +177,7 @@ function formatTime(iso) {
 
 function wsUrl() {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const host = import.meta.env.VITE_WS_HOST || window.location.host;
-  return `${proto}//${host}/ws/chat/${props.ticketId}/`;
+  return `${proto}//${wsHost()}/ws/chat/${props.ticketId}/`;
 }
 
 const { status: wsStatus, send: wsSend, retry: wsRetry, close: wsClose } = useWsConnection({
