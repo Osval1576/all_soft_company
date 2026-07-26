@@ -71,9 +71,9 @@
           <aside class="ticket-list">
             <div v-if="loading" class="list-state">Cargando...</div>
             <template v-else>
-              <div v-if="tf.result.length === 0" class="list-state">No tienes tickets asignados.</div>
+              <div v-if="tf.result.value.length === 0" class="list-state">No tienes tickets asignados.</div>
               <button
-                v-for="t in tf.result"
+                v-for="t in tf.result.value"
                 :key="t.id"
                 class="ticket-item"
                 :class="{ 'ticket-item--active': selectedTicket?.id === t.id }"

@@ -62,8 +62,8 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-if="tf.result.length === 0"><td colspan="10" class="empty-cell">Sin resultados.</td></tr>
-              <tr v-for="t in tf.result" :key="t.id">
+              <tr v-if="tf.result.value.length === 0"><td colspan="10" class="empty-cell">Sin resultados.</td></tr>
+              <tr v-for="t in tf.result.value" :key="t.id">
                 <td><span class="mono">{{ t.reference }}</span></td>
                 <td class="td-title">{{ t.titulo }}</td>
                 <td>
