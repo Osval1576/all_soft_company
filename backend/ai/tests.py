@@ -93,6 +93,73 @@ class AiDraftTests(TestCase):
         mock_gen.assert_not_called()
 
 
+SUMMARY = "El cliente no puede entrar al panel. Se le pidió reiniciar; sigue igual. Falta escalar a infra."
+
+
+class AiSummaryTests(TestCase):
+    """Fase 2A — resumen del hilo del ticket."""
+
+    def setUp(self):
+        self.c = APIClient()
+        self.org = create_org("AISUM")  # Business por defecto
+        self.admin = User.objects.create_user("sum_admin", role="ADMIN",
+                                               organization=self.org, is_active=True)
+        self.agent = User.objects.create_user("sum_agent", role="AGENT",
+                                               organization=self.org, is_active=True)
+        self.customer = User.objects.create_user("sum_cust", role="CUSTOMER",
+                                                  organization=self.org, is_active=True)
+        self.ticket = Ticket.objects.create(
+            reference="SUM-1", titulo="No entro al panel",
+            descripcion="No puedo entrar al panel desde ayer.",
+            creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org, estado="IN_PROGRESS")
+        TicketMessage.objects.create(ticket=self.ticket, sender=self.customer,
+                                     content="Ya reinicié y sigue sin entrar.")
+
+    def _url(self, ticket_id):
+        return f"/api/ai/tickets/{ticket_id}/summary/"
+
+    @patch("ai.gateway.generate", return_value=SUMMARY)
+    def test_agent_gets_summary_with_thread(self, mock_gen):
+        self.c.force_authenticate(self.agent)
+        r = self.c.post(self._url(self.ticket.id))
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.data["summary"], SUMMARY)
+        prompt = mock_gen.call_args.kwargs["user_prompt"]
+        self.assertIn("No puedo entrar al panel", prompt)
+        self.assertIn("Ya reinicié", prompt)
+
+    @patch("ai.gateway.generate", return_value=SUMMARY)
+    def test_customer_forbidden(self, mock_gen):
+        self.c.force_authenticate(self.customer)
+        r = self.c.post(self._url(self.ticket.id))
+        self.assertEqual(r.status_code, 403)
+        mock_gen.assert_not_called()
+
+    @patch("ai.gateway.generate", return_value=SUMMARY)
+    def test_free_plan_forbidden_with_upsell(self, mock_gen):
+        from billing.models import Plan
+        from billing.testing import seed_plans
+        seed_plans()
+        self.org.subscription.plan = Plan.objects.get(key="free")
+        self.org.subscription.save()
+        self.c.force_authenticate(self.agent)
+        r = self.c.post(self._url(self.ticket.id))
+        self.assertEqual(r.status_code, 403)
+        self.assertTrue(r.data.get("upsell"))
+        mock_gen.assert_not_called()
+
+    @patch("ai.gateway.generate", return_value=SUMMARY)
+    def test_cross_org_404(self, mock_gen):
+        other = create_org("SUMOTHER")
+        outsider = User.objects.create_user("sum_out", role="ADMIN",
+                                             organization=other, is_active=True)
+        self.c.force_authenticate(outsider)
+        r = self.c.post(self._url(self.ticket.id))
+        self.assertEqual(r.status_code, 404)
+        mock_gen.assert_not_called()
+
+
 class AiTriageTests(TestCase):
     """Fase 1B — auto-triage de prioridad al crear el ticket."""
 
