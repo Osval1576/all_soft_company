@@ -33,3 +33,9 @@ def org_tickets(org):
     from tickets_t.models import Ticket
     qs = Ticket.objects.select_related("sla", "csat")
     return qs.filter(organization=org) if org is not None else qs.none()
+
+
+def org_kb(org):
+    from kb.models import Article
+    qs = Article.objects.all()
+    return qs.filter(organization=org) if org is not None else qs.none()

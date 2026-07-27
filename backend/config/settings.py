@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "csat",
     "metrics",
     "ai",
+    "kb",
     "channels",
     "landing_cms",
     "django_cleanup.apps.CleanupConfig",
