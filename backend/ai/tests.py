@@ -91,3 +91,59 @@ class AiDraftTests(TestCase):
         r = self.c.post(_url(self.ticket.id))
         self.assertEqual(r.status_code, 404)
         mock_gen.assert_not_called()
+
+
+class AiTriageTests(TestCase):
+    """Fase 1B — auto-triage de prioridad al crear el ticket."""
+
+    def setUp(self):
+        self.org = create_org("AITRIAGE")  # Business por defecto
+        self.customer = User.objects.create_user("tri_cust", role="CUSTOMER",
+                                                  organization=self.org, is_active=True)
+        self.c = APIClient()
+        self.c.force_authenticate(self.customer)
+
+    def _create(self, **extra):
+        data = {"titulo": "Se cayó el sitio", "descripcion": "Todo el portal está caído."}
+        data.update(extra)
+        return self.c.post("/api/tickets_t/", data, format="json")
+
+    @patch("ai.gateway.generate", return_value="URGENT")
+    def test_autotriage_sets_priority_and_logs_event(self, mock_gen):
+        r = self._create(prioridad="MEDIUM")
+        self.assertEqual(r.status_code, 201, r.content)
+        t = Ticket.objects.get(id=r.data["id"])
+        self.assertEqual(t.prioridad, "URGENT")
+        ev = t.events.filter(kind="priority_changed").first()
+        self.assertIsNotNone(ev)
+        self.assertTrue(ev.payload.get("auto"))
+        self.assertEqual(ev.payload.get("from"), "MEDIUM")
+        self.assertEqual(ev.payload.get("to"), "URGENT")
+        mock_gen.assert_called_once()
+
+    @patch("ai.gateway.generate", return_value="URGENT")
+    def test_free_plan_skips_autotriage(self, mock_gen):
+        from billing.models import Plan
+        from billing.testing import seed_plans
+        seed_plans()
+        self.org.subscription.plan = Plan.objects.get(key="free")
+        self.org.subscription.save()
+        r = self._create(prioridad="LOW")
+        self.assertEqual(r.status_code, 201, r.content)
+        t = Ticket.objects.get(id=r.data["id"])
+        self.assertEqual(t.prioridad, "LOW")
+        mock_gen.assert_not_called()
+
+    @patch("ai.gateway.generate", side_effect=RuntimeError("boom"))
+    def test_autotriage_failure_does_not_break_creation(self, mock_gen):
+        r = self._create(prioridad="LOW")
+        self.assertEqual(r.status_code, 201, r.content)
+        t = Ticket.objects.get(id=r.data["id"])
+        self.assertEqual(t.prioridad, "LOW")  # fallback al valor enviado
+
+    @patch("ai.gateway.generate", return_value="banana")
+    def test_autotriage_invalid_response_ignored(self, mock_gen):
+        r = self._create(prioridad="MEDIUM")
+        self.assertEqual(r.status_code, 201, r.content)
+        t = Ticket.objects.get(id=r.data["id"])
+        self.assertEqual(t.prioridad, "MEDIUM")

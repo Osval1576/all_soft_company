@@ -174,6 +174,9 @@ AI_FEATURES_ENABLED = _env_bool("AI_FEATURES_ENABLED", DEBUG)
 # Modelo por defecto para generación (borradores). claude-opus-4-8 por defecto;
 # se puede cambiar vía env (p. ej. claude-sonnet-5 para reducir costo).
 AI_DRAFT_MODEL = _env("AI_DRAFT_MODEL", "claude-opus-4-8")
+# Modelo de clasificación (auto-triage 1B): tarea corta y de alto volumen, se
+# usa un modelo Haiku por costo/latencia. Configurable vía env.
+AI_TRIAGE_MODEL = _env("AI_TRIAGE_MODEL", "claude-haiku-4-5")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
