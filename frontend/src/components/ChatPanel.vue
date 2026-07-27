@@ -73,6 +73,15 @@
         aria-label="Adjuntar archivo"
       >📎</button>
 
+      <button
+        v-if="canDraft"
+        class="ai-btn"
+        :disabled="drafting || uploading"
+        @click="suggestReply"
+        :title="drafting ? 'Generando…' : 'Sugerir respuesta con IA'"
+        aria-label="Sugerir respuesta con IA"
+      >{{ drafting ? '…' : '✨' }}</button>
+
       <div class="composer-main">
         <div v-if="pendingFile" class="pending-chip">
           <span class="pending-name">{{ pendingFile.name }}</span>
@@ -102,6 +111,7 @@
 <script setup>
 import { nextTick, ref, watch, computed, onBeforeUnmount } from "vue";
 import { getTicketMessages, getTicketEvents, uploadAttachment } from "../api/tickets.api";
+import { draftReply } from "../api/ai.api";
 import { wsHost } from "../api/http";
 import { useAuthStore } from "../stores/auth.store";
 import { useNotificationsStore } from "../stores/notifications.store";
@@ -138,6 +148,10 @@ const fileInput = ref(null);
 const pendingFile = ref(null);
 const uploading = ref(false);
 
+// IA (Fase 1A): solo agentes/admin ven el botón de auto-borrador.
+const canDraft = computed(() => ["AGENT", "ADMIN"].includes(auth.user?.role));
+const drafting = ref(false);
+
 const canSend = computed(() => {
   if (uploading.value) return false;
   if (pendingFile.value) return true;
@@ -150,6 +164,23 @@ function onFilePicked(e) {
   e.target.value = "";
 }
 function clearPending() { pendingFile.value = null; }
+
+async function suggestReply() {
+  if (drafting.value) return;
+  drafting.value = true;
+  try {
+    const { draft: suggestion } = await draftReply(props.ticketId);
+    if (suggestion) draft.value = suggestion;
+  } catch (err) {
+    const data = err?.response?.data;
+    const msg = data?.upsell
+      ? "La sugerencia con IA está disponible en los planes Pro y Business."
+      : data?.detail || "No se pudo generar la sugerencia.";
+    notif.pushToast({ title: msg, tone: data?.upsell ? "info" : "error" });
+  } finally {
+    drafting.value = false;
+  }
+}
 function onCsatSubmitted(payload) {
   emit("csat-submitted", payload);
 }
@@ -398,6 +429,17 @@ onBeforeUnmount(() => notif.setActiveTicket(null));
 }
 .clip-btn:hover:not(:disabled) { background: var(--border); }
 .clip-btn:disabled { opacity: .4; cursor: not-allowed; }
+.ai-btn {
+  flex-shrink: 0;
+  width: 38px; height: 38px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  cursor: pointer;
+  font-size: 16px;
+}
+.ai-btn:hover:not(:disabled) { background: var(--border); }
+.ai-btn:disabled { opacity: .4; cursor: not-allowed; }
 .composer-main { flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .pending-chip {
   display: inline-flex; align-items: center; gap: 8px;

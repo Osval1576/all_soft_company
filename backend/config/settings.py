@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "sla",
     "csat",
     "metrics",
+    "ai",
     "channels",
     "landing_cms",
     "django_cleanup.apps.CleanupConfig",
@@ -164,6 +165,15 @@ STATIC_ROOT = _env("DJANGO_STATIC_ROOT", str(BASE_DIR / "staticfiles"))
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# -----------------------
+# IA (wedge Fase 1)
+# -----------------------
+# Flag global de features de IA. En prod requiere además ANTHROPIC_API_KEY.
+AI_FEATURES_ENABLED = _env_bool("AI_FEATURES_ENABLED", DEBUG)
+# Modelo por defecto para generación (borradores). claude-opus-4-8 por defecto;
+# se puede cambiar vía env (p. ej. claude-sonnet-5 para reducir costo).
+AI_DRAFT_MODEL = _env("AI_DRAFT_MODEL", "claude-opus-4-8")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
