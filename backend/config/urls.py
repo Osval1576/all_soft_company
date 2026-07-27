@@ -44,6 +44,7 @@ urlpatterns = [
     path("api/admin/landing/", include("landing_cms.admin_urls")),
     path("api/admin/site-settings/", v_settings_admin),
     path("api/admin/sla/", include("sla.admin_urls")),
+    path("api/admin/kb/", include("kb.admin_urls")),
     path("api/", include("tickets_t.urls")),
     path("api/", include("notifications.urls")),
     path("api/csat/", include("csat.urls")),
