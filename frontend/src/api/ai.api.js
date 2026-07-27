@@ -5,3 +5,9 @@ export async function draftReply(ticketId) {
   const res = await http.post(`/api/ai/tickets/${ticketId}/draft/`);
   return res.data;
 }
+
+// Fase 2A — resumen del hilo. Devuelve { summary } o 403 (customer / plan sin IA).
+export async function summarizeTicket(ticketId) {
+  const res = await http.post(`/api/ai/tickets/${ticketId}/summary/`);
+  return res.data;
+}

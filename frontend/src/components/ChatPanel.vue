@@ -32,6 +32,14 @@
       <CsatDisplay :csat="csat" />
     </div>
 
+    <div v-if="summary" class="ai-summary">
+      <div class="ai-summary-head">
+        <span class="ai-summary-title">✨ Resumen IA</span>
+        <button class="ai-summary-close" @click="clearSummary" aria-label="Cerrar resumen">✕</button>
+      </div>
+      <p class="ai-summary-body">{{ summary }}</p>
+    </div>
+
     <section class="messages" ref="messagesEl">
       <div v-if="loading" class="loading-state">Cargando mensajes...</div>
 
@@ -82,6 +90,15 @@
         aria-label="Sugerir respuesta con IA"
       >{{ drafting ? '…' : '✨' }}</button>
 
+      <button
+        v-if="canDraft"
+        class="ai-btn"
+        :disabled="summarizing"
+        @click="suggestSummary"
+        :title="summarizing ? 'Resumiendo…' : 'Resumir el hilo con IA'"
+        aria-label="Resumir el hilo con IA"
+      >{{ summarizing ? '…' : '📋' }}</button>
+
       <div class="composer-main">
         <div v-if="pendingFile" class="pending-chip">
           <span class="pending-name">{{ pendingFile.name }}</span>
@@ -111,7 +128,7 @@
 <script setup>
 import { nextTick, ref, watch, computed, onBeforeUnmount } from "vue";
 import { getTicketMessages, getTicketEvents, uploadAttachment } from "../api/tickets.api";
-import { draftReply } from "../api/ai.api";
+import { draftReply, summarizeTicket } from "../api/ai.api";
 import { wsHost } from "../api/http";
 import { useAuthStore } from "../stores/auth.store";
 import { useNotificationsStore } from "../stores/notifications.store";
@@ -148,9 +165,11 @@ const fileInput = ref(null);
 const pendingFile = ref(null);
 const uploading = ref(false);
 
-// IA (Fase 1A): solo agentes/admin ven el botón de auto-borrador.
+// IA (Fase 1A/2A): solo agentes/admin ven los botones de IA.
 const canDraft = computed(() => ["AGENT", "ADMIN"].includes(auth.user?.role));
 const drafting = ref(false);
+const summarizing = ref(false);
+const summary = ref("");
 
 const canSend = computed(() => {
   if (uploading.value) return false;
@@ -181,6 +200,24 @@ async function suggestReply() {
     drafting.value = false;
   }
 }
+
+async function suggestSummary() {
+  if (summarizing.value) return;
+  summarizing.value = true;
+  try {
+    const { summary: text } = await summarizeTicket(props.ticketId);
+    if (text) summary.value = text;
+  } catch (err) {
+    const data = err?.response?.data;
+    const msg = data?.upsell
+      ? "El resumen con IA está disponible en los planes Pro y Business."
+      : data?.detail || "No se pudo generar el resumen.";
+    notif.pushToast({ title: msg, tone: data?.upsell ? "info" : "error" });
+  } finally {
+    summarizing.value = false;
+  }
+}
+function clearSummary() { summary.value = ""; }
 function onCsatSubmitted(payload) {
   emit("csat-submitted", payload);
 }
@@ -455,4 +492,25 @@ onBeforeUnmount(() => notif.setActiveTicket(null));
 .pending-remove { color: var(--text-3); font-size: 11px; }
 .pending-remove:hover { color: var(--c-urgent); }
 .csat-banner { flex-shrink: 0; }
+.ai-summary {
+  flex-shrink: 0;
+  margin: 12px 16px 0;
+  padding: 10px 12px;
+  border: 0.5px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+.ai-summary-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.ai-summary-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+[data-theme="dark"] .ai-summary-title { color: var(--accent-2); }
+.ai-summary-close { color: var(--text-3); font-size: 11px; line-height: 1; }
+.ai-summary-close:hover { color: var(--text); }
+.ai-summary-body { font-size: 13px; line-height: 1.5; color: var(--text); white-space: pre-wrap; margin: 0; }
 </style>

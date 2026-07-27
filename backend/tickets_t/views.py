@@ -225,6 +225,11 @@ class TicketViewSet(viewsets.ModelViewSet):
         except Exception:
             logger.exception("notification dispatch failed for ticket %s", ticket.id)
 
+        # 2B: escalada por sentimiento (solo si el que adjunta es el cliente).
+        if _role(request.user) == "CUSTOMER" and caption:
+            from .ai_hooks import apply_sentiment_escalation
+            apply_sentiment_escalation(ticket, caption)
+
         return Response(payload, status=201)
 
     @action(detail=True, methods=["get"],

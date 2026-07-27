@@ -51,6 +51,10 @@ class TicketChatConsumer(AsyncWebsocketConsumer):
         }
         await self.channel_layer.group_send(self.group_name, payload)
 
+        # 2B: escalada por sentimiento (solo mensajes del cliente). Corre DESPUÉS
+        # del broadcast para no demorar el eco del chat; es resiliente.
+        await self.maybe_escalate(user.id, self.ticket_id, content)
+
     async def chat_message(self, event):
         await self.send(text_data=json.dumps(event["message"]))
 
@@ -73,6 +77,21 @@ class TicketChatConsumer(AsyncWebsocketConsumer):
             return False
 
         return can_access_ticket(user, ticket)
+
+    @database_sync_to_async
+    def maybe_escalate(self, user_id, ticket_id, content):
+        from django.contrib.auth import get_user_model
+        from tenancy.scoping import org_tickets
+        from .ai_hooks import apply_sentiment_escalation
+        User = get_user_model()
+        try:
+            user = User.objects.get(id=user_id)
+            if getattr(user, "role", None) != "CUSTOMER":
+                return
+            ticket = org_tickets(user.organization).get(id=ticket_id)
+        except (Ticket.DoesNotExist, User.DoesNotExist):
+            return
+        apply_sentiment_escalation(ticket, content)
 
     @database_sync_to_async
     def create_message(self, user_id, ticket_id, content):
