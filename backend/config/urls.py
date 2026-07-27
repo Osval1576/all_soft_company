@@ -49,6 +49,7 @@ urlpatterns = [
     path("api/csat/", include("csat.urls")),
     path("api/metrics/", include("metrics.urls")),
     path("api/billing/", include("billing.urls")),
+    path("api/ai/", include("ai.urls")),
     path("api/branding/", include("tenancy.branding_urls")),
     path("api/public/branding/<str:slug>/", PublicBrandingView.as_view(), name="public-branding"),
     path("api/auth/login-cookie/", LoginCookieView.as_view(), name="login_cookie"),

@@ -79,6 +79,35 @@ class TicketViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             ticket = serializer.save()
             self._emit(ticket, "created", self.request.user)
+        # 1B: auto-triage fuera de la transacción (llamada de red a la IA); su
+        # resultado no debe demorar ni bloquear el commit del ticket.
+        self._maybe_auto_triage(ticket)
+
+    def _maybe_auto_triage(self, ticket):
+        """Sugiere la prioridad con IA al crear (si el plan lo habilita).
+
+        Resiliente por diseño: cualquier fallo del servicio de IA se loguea y se
+        ignora — la creación del ticket nunca depende de la IA.
+        """
+        org = getattr(self.request, "organization", None)
+        try:
+            from ai import services as ai_services
+            if not ai_services.ai_enabled(org):
+                return
+            suggested = ai_services.triage_priority(ticket)
+        except Exception:
+            logger.warning("auto-triage IA falló para ticket %s", ticket.id, exc_info=True)
+            return
+        if not suggested or suggested == ticket.prioridad:
+            return
+        old = ticket.prioridad
+        ticket.prioridad = suggested
+        ticket.save(update_fields=["prioridad"])
+        # Evento auditable, sin notificación (actor de sistema = None).
+        TicketEvent.objects.create(
+            ticket=ticket, kind="priority_changed", actor=None,
+            payload={"from": old, "to": suggested, "auto": True},
+        )
 
     def perform_update(self, serializer):
         inst = serializer.instance
