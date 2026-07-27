@@ -119,3 +119,34 @@ def triage_priority(ticket):
     raw = gateway.generate(system=system, user_prompt=user_prompt, max_tokens=8, model=model)
     val = (raw or "").strip().upper()
     return val if val in VALID_PRIORITIES else None
+
+
+# --- Fase 2B: sentimiento del mensaje -> prioridad ---------------------------
+
+def build_sentiment_prompt(ticket, message_text):
+    """Arma (system, user_prompt) para evaluar la prioridad que amerita el
+    último mensaje del cliente según su sentimiento/urgencia."""
+    system = (
+        "Analizás el sentimiento y la urgencia del último mensaje de un cliente "
+        "en un ticket de soporte. Considerá frustración, enojo, impacto en el "
+        "negocio y urgencia explícita. Respondés con UNA sola palabra en "
+        "mayúsculas indicando la prioridad que amerita: LOW, MEDIUM, HIGH o "
+        "URGENT. Sin explicaciones ni puntuación."
+    )
+    user_prompt = (
+        f"Ticket: {ticket.titulo}\n"
+        f"Último mensaje del cliente: {message_text}\n\n"
+        "Prioridad que amerita (LOW, MEDIUM, HIGH o URGENT):"
+    )
+    return system, user_prompt
+
+
+def assess_sentiment_priority(ticket, message_text):
+    """Devuelve la prioridad que amerita el mensaje (LOW/MEDIUM/HIGH/URGENT) o
+    None si la respuesta no es válida. Puede propagar excepciones del gateway."""
+    from . import gateway
+    system, user_prompt = build_sentiment_prompt(ticket, message_text)
+    model = getattr(settings, "AI_SENTIMENT_MODEL", "claude-haiku-4-5")
+    raw = gateway.generate(system=system, user_prompt=user_prompt, max_tokens=8, model=model)
+    val = (raw or "").strip().upper()
+    return val if val in VALID_PRIORITIES else None

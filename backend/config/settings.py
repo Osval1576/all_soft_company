@@ -180,6 +180,9 @@ AI_TRIAGE_MODEL = _env("AI_TRIAGE_MODEL", "claude-haiku-4-5")
 # Modelo de resumen (2A): tarea de generación; por defecto el mismo que los
 # borradores (claude-opus-4-8). Se puede bajar a Sonnet vía env por costo.
 AI_SUMMARY_MODEL = _env("AI_SUMMARY_MODEL", "claude-opus-4-8")
+# Modelo de análisis de sentimiento (2B): clasificación de alto volumen sobre
+# cada mensaje del cliente, modelo Haiku por costo/latencia.
+AI_SENTIMENT_MODEL = _env("AI_SENTIMENT_MODEL", "claude-haiku-4-5")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

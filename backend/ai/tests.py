@@ -214,3 +214,69 @@ class AiTriageTests(TestCase):
         self.assertEqual(r.status_code, 201, r.content)
         t = Ticket.objects.get(id=r.data["id"])
         self.assertEqual(t.prioridad, "MEDIUM")
+
+
+class AiSentimentEscalationTests(TestCase):
+    """Fase 2B — sentimiento del mensaje del cliente sube la prioridad (nunca la baja)."""
+
+    def setUp(self):
+        self.org = create_org("AISENT")  # Business por defecto
+        self.customer = User.objects.create_user("sent_cust", role="CUSTOMER",
+                                                  organization=self.org, is_active=True)
+        self.agent = User.objects.create_user("sent_agent", role="AGENT",
+                                               organization=self.org, is_active=True)
+        self.ticket = Ticket.objects.create(
+            reference="SENT-1", titulo="Pago rechazado",
+            descripcion="No puedo pagar la suscripción.",
+            creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org, estado="IN_PROGRESS", prioridad="MEDIUM")
+
+    @patch("ai.gateway.generate", return_value="URGENT")
+    def test_negative_sentiment_raises_priority(self, mock_gen):
+        from tickets_t.ai_hooks import apply_sentiment_escalation
+        result = apply_sentiment_escalation(
+            self.ticket, "Esto es un desastre, llevo días esperando y nadie responde!!")
+        self.ticket.refresh_from_db()
+        self.assertEqual(result, "URGENT")
+        self.assertEqual(self.ticket.prioridad, "URGENT")
+        ev = self.ticket.events.filter(kind="priority_changed").first()
+        self.assertIsNotNone(ev)
+        self.assertTrue(ev.payload.get("auto"))
+        self.assertEqual(ev.payload.get("reason"), "sentiment")
+        self.assertEqual(ev.payload.get("from"), "MEDIUM")
+        self.assertEqual(ev.payload.get("to"), "URGENT")
+        prompt = mock_gen.call_args.kwargs["user_prompt"]
+        self.assertIn("nadie responde", prompt)
+
+    @patch("ai.gateway.generate", return_value="LOW")
+    def test_never_lowers_priority(self, mock_gen):
+        self.ticket.prioridad = "HIGH"
+        self.ticket.save()
+        from tickets_t.ai_hooks import apply_sentiment_escalation
+        result = apply_sentiment_escalation(self.ticket, "gracias, ya está resuelto")
+        self.ticket.refresh_from_db()
+        self.assertIsNone(result)
+        self.assertEqual(self.ticket.prioridad, "HIGH")
+        self.assertFalse(self.ticket.events.filter(kind="priority_changed").exists())
+
+    @patch("ai.gateway.generate", return_value="URGENT")
+    def test_free_plan_no_escalation(self, mock_gen):
+        from billing.models import Plan
+        from billing.testing import seed_plans
+        seed_plans()
+        self.org.subscription.plan = Plan.objects.get(key="free")
+        self.org.subscription.save()
+        from tickets_t.ai_hooks import apply_sentiment_escalation
+        result = apply_sentiment_escalation(self.ticket, "esto es urgentísimo!!")
+        self.ticket.refresh_from_db()
+        self.assertIsNone(result)
+        self.assertEqual(self.ticket.prioridad, "MEDIUM")
+        mock_gen.assert_not_called()
+
+    @patch("ai.gateway.generate", side_effect=RuntimeError("boom"))
+    def test_ai_failure_is_silent(self, mock_gen):
+        from tickets_t.ai_hooks import apply_sentiment_escalation
+        result = apply_sentiment_escalation(self.ticket, "algo pasó")
+        self.ticket.refresh_from_db()
+        self.assertIsNone(result)
+        self.assertEqual(self.ticket.prioridad, "MEDIUM")
