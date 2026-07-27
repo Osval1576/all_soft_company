@@ -18,9 +18,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import me, health
-from .auth_views import LoginCookieView, RefreshCookieView, LogoutView
+from rest_framework_simplejwt.views import TokenRefreshView
+from .views import me, health, csrf
+from .auth_views import (
+    LoginCookieView, RefreshCookieView, LogoutView, ThrottledTokenObtainPairView,
+)
 from landing_cms.admin_views import SiteSettingsAdminView
 from tenancy.branding_views import PublicBrandingView
 
@@ -30,7 +32,7 @@ urlpatterns = [
     path("django-admin/", admin.site.urls),
 
     path("api/auth/", include("accounts.urls")),
-    path("api/auth/login/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/auth/login/", ThrottledTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
     path("api/me/", me, name="me"),
@@ -52,6 +54,7 @@ urlpatterns = [
     path("api/auth/login-cookie/", LoginCookieView.as_view(), name="login_cookie"),
     path("api/auth/refresh-cookie/", RefreshCookieView.as_view(), name="refresh_cookie"),
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),
+    path("api/auth/csrf/", csrf, name="csrf"),
 ]
 
 if settings.DEBUG:

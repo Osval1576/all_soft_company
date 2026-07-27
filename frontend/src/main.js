@@ -6,6 +6,10 @@ import { createPinia } from "pinia";
 import router from "./router";
 import { i18n } from "./i18n";
 import VueApexCharts from "vue3-apexcharts";
+import { ensureCsrf } from "./api/http";
+
+// Trae la cookie csrftoken antes de cualquier mutación (CN-005).
+ensureCsrf();
 
 createApp(App)
   .use(createPinia())

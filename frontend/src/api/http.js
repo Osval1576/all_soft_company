@@ -8,7 +8,18 @@ const base = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 export const http = axios.create({
   baseURL: base,
   withCredentials: true,
+  // CSRF (CN-005): Django setea la cookie `csrftoken`; axios la reenvía como
+  // header X-CSRFToken en los métodos inseguros. withXSRFToken:true fuerza el
+  // envío también en dev (front y back en orígenes distintos).
+  xsrfCookieName: "csrftoken",
+  xsrfHeaderName: "X-CSRFToken",
+  withXSRFToken: true,
 });
+
+// Obtiene/refresca la cookie csrftoken. Se llama al iniciar la app.
+export function ensureCsrf() {
+  return http.get("/api/auth/csrf/").catch(() => {});
+}
 
 // Host para WebSockets, derivado del mismo origen que la API: en dev apunta al
 // backend (:8000, distinto puerto que Vite), en prod (base="") queda

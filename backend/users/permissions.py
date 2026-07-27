@@ -25,3 +25,19 @@ class IsAdminRole(BasePermission):
         if not (u and u.is_authenticated):
             return False
         return bool(u.is_superuser or getattr(u, "role", None) == "ADMIN")
+
+
+class IsPlatformStaff(BasePermission):
+    """Solo staff de plataforma (superuser / is_staff).
+
+    Para recursos GLOBALES que no pertenecen a ningún tenant (p.ej. el CMS del
+    sitio público). El rol ADMIN es de tenant: un admin de una organización NO
+    debe poder editar contenido compartido por todos los tenants (CN-001).
+    """
+    message = "Solo staff de la plataforma."
+
+    def has_permission(self, request, view):
+        u = request.user
+        if not (u and u.is_authenticated):
+            return False
+        return bool(u.is_superuser or u.is_staff)

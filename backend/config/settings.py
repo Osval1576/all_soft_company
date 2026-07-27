@@ -203,7 +203,14 @@ REST_FRAMEWORK = {
         "contact": "5/hour",
         "register": "5/hour",
         "resend": "5/hour",
+        # CN-003: frena la fuerza bruta de credenciales por IP.
+        "login": _env("LOGIN_THROTTLE_RATE", "5/min"),
     },
+    # Detrás de Nginx (deploy G) el cliente real viene en X-Forwarded-For; con 1
+    # proxy DRF toma la IP correcta para el throttle (y es a prueba de spoofing:
+    # Nginx antepone la IP real como último elemento). En dev sin proxy no hay
+    # XFF y DRF cae a REMOTE_ADDR. Ajustable si hay más/menos proxies.
+    "NUM_PROXIES": int(_env("NUM_PROXIES", "1")),
 }
 
 # Cache (presence de notificaciones). LocMem en dev; Redis si REDIS_URL está seteado (G).

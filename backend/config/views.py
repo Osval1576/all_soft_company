@@ -1,7 +1,17 @@
 from django.db import connection
+from django.http import JsonResponse
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+
+
+@ensure_csrf_cookie
+def csrf(request):
+    """Setea la cookie `csrftoken` (legible por JS) para que el SPA la reenvíe
+    como header X-CSRFToken en los métodos inseguros (CN-005). El front lo llama
+    al iniciar."""
+    return JsonResponse({"detail": "CSRF cookie set."})
 
 
 @api_view(["GET"])
@@ -15,8 +25,6 @@ def me(request):
             "id": u.id,
             "username": u.username,
             "email": u.email,
-            "is_staff": u.is_staff,
-            "is_superuser": u.is_superuser,
             "role": u.role,
             "organization": org.name if org else None,
             "branding": branding_payload(org, request) if org else None,

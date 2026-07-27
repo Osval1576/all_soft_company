@@ -8,7 +8,7 @@ from .models import (
     HeroContent, AboutContent, SiteSettings,
     Feature, TeamMember, Location,
 )
-from users.permissions import IsAdminRole
+from users.permissions import IsPlatformStaff
 
 from .serializers import (
     HeroSerializer, AboutSerializer, SiteSettingsSerializer,
@@ -17,7 +17,7 @@ from .serializers import (
 
 
 class _SingletonAdminView(APIView):
-    permission_classes = [IsAdminRole]
+    permission_classes = [IsPlatformStaff]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
     model = None
     serializer_class = None
@@ -50,7 +50,7 @@ class SiteSettingsAdminView(_SingletonAdminView):
 
 
 class _OrderedAdminViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAdminRole]
+    permission_classes = [IsPlatformStaff]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     @action(detail=False, methods=["post"])
