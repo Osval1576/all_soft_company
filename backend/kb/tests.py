@@ -5,12 +5,15 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from tenancy.testing import create_org
-from kb.models import Article
+from kb.models import Article, ArticleSuggestion
+from tickets_t.models import Ticket
 
 User = get_user_model()
 
 BASE = "/api/admin/kb/articles/"
 DEFLECT = "/api/kb/deflect/"
+SUGG = "/api/admin/kb/suggestions/"
+KB_ARTICLE = "Restablecer contraseña\n\nAndá a Ajustes y tocá Restablecer."
 
 
 class KbAdminTests(TestCase):
@@ -203,3 +206,103 @@ class KbDeflectTests(TestCase):
     def test_requires_query(self):
         r = self.c.post(DEFLECT, {}, format="json")
         self.assertEqual(r.status_code, 400)
+
+
+class KbSuggestionTests(TestCase):
+    """Fase 5.2 — KB auto-alimentada: sugerencia al resolver + cola admin."""
+
+    def setUp(self):
+        self.org = create_org("KBSUG")  # Business
+        self.admin = User.objects.create_user("sug_admin", role="ADMIN",
+                                               organization=self.org, is_active=True)
+        self.agent = User.objects.create_user("sug_agent", role="AGENT",
+                                               organization=self.org, is_active=True)
+        self.customer = User.objects.create_user("sug_cust", role="CUSTOMER",
+                                                  organization=self.org, is_active=True)
+        self.ticket = Ticket.objects.create(
+            reference="SUG-1", titulo="No me llega el mail de verificación",
+            descripcion="No recibo el correo de verificación al registrarme.",
+            creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org, estado="OPEN")
+
+    # ---- generación / orquestador ----
+    @patch("ai.gateway.generate", return_value=KB_ARTICLE)
+    def test_maybe_suggest_creates_pending(self, _g):
+        from kb.suggestions import maybe_suggest_from_ticket
+        s = maybe_suggest_from_ticket(self.ticket)
+        self.assertIsNotNone(s)
+        self.assertEqual(s.status, "pending")
+        self.assertEqual(s.title, "Restablecer contraseña")
+        self.assertIn("Andá a Ajustes", s.body)
+        self.assertEqual(s.source_ticket_id, self.ticket.id)
+
+    @patch("ai.gateway.generate", return_value=KB_ARTICLE)
+    def test_no_duplicate_pending(self, _g):
+        from kb.suggestions import maybe_suggest_from_ticket
+        maybe_suggest_from_ticket(self.ticket)
+        maybe_suggest_from_ticket(self.ticket)
+        self.assertEqual(ArticleSuggestion.objects.filter(source_ticket=self.ticket).count(), 1)
+
+    @patch("ai.gateway.generate", return_value=KB_ARTICLE)
+    def test_free_plan_no_suggestion(self, _g):
+        from billing.models import Plan
+        from billing.testing import seed_plans
+        seed_plans()
+        self.org.subscription.plan = Plan.objects.get(key="free")
+        self.org.subscription.save()
+        from kb.suggestions import maybe_suggest_from_ticket
+        self.assertIsNone(maybe_suggest_from_ticket(self.ticket))
+
+    @patch("ai.gateway.generate", side_effect=RuntimeError("boom"))
+    def test_ai_failure_is_silent(self, _g):
+        from kb.suggestions import maybe_suggest_from_ticket
+        self.assertIsNone(maybe_suggest_from_ticket(self.ticket))
+
+    # ---- hook al resolver el ticket (integración vía API) ----
+    @patch("ai.gateway.generate", return_value=KB_ARTICLE)
+    def test_resolving_ticket_creates_suggestion(self, _g):
+        c = APIClient()
+        c.force_authenticate(self.admin)
+        r = c.patch(f"/api/tickets_t/{self.ticket.id}/", {"estado": "RESOLVED"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(ArticleSuggestion.objects.filter(
+            source_ticket=self.ticket, status="pending").exists())
+
+    # ---- cola admin ----
+    def _sugg(self):
+        return ArticleSuggestion.objects.create(
+            organization=self.org, title="Cómo verificar tu correo",
+            body="Revisá spam y reenviá el correo desde tu perfil.",
+            source_ticket=self.ticket)
+
+    def test_admin_lists_pending_scoped(self):
+        self._sugg()
+        other = create_org("KBSUG2")
+        ArticleSuggestion.objects.create(organization=other, title="ajena", body="x")
+        c = APIClient(); c.force_authenticate(self.admin)
+        r = c.get(SUGG)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual([s["title"] for s in r.data], ["Cómo verificar tu correo"])
+
+    def test_accept_creates_published_article(self):
+        s = self._sugg()
+        c = APIClient(); c.force_authenticate(self.admin)
+        r = c.post(f"{SUGG}{s.id}/accept/")
+        self.assertEqual(r.status_code, 201, r.content)
+        art = Article.objects.get(id=r.data["article_id"])
+        self.assertTrue(art.is_published)
+        self.assertEqual(art.organization_id, self.org.id)
+        s.refresh_from_db()
+        self.assertEqual(s.status, "accepted")
+
+    def test_dismiss(self):
+        s = self._sugg()
+        c = APIClient(); c.force_authenticate(self.admin)
+        r = c.post(f"{SUGG}{s.id}/dismiss/")
+        self.assertEqual(r.status_code, 200)
+        s.refresh_from_db()
+        self.assertEqual(s.status, "dismissed")
+
+    def test_agent_forbidden(self):
+        c = APIClient(); c.force_authenticate(self.agent)
+        self.assertEqual(c.get(SUGG).status_code, 403)

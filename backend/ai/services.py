@@ -215,3 +215,47 @@ def generate_insights(snapshot):
     from . import gateway
     system, user_prompt = build_insights_prompt(snapshot)
     return gateway.generate(system=system, user_prompt=user_prompt, max_tokens=1024, tier="quality")
+
+
+# --- Fase 5.2: KB auto-alimentada (sugerencia desde ticket resuelto) ----------
+
+def build_kb_suggestion_prompt(ticket):
+    """Arma (system, user_prompt) para redactar un artículo de KB a partir del
+    hilo de un ticket resuelto."""
+    system = (
+        "Sos un redactor de base de conocimiento. A partir de un ticket de soporte "
+        "resuelto, escribís un artículo de KB GENÉRICO y reutilizable (no menciones "
+        "datos personales del cliente ni el ticket puntual). Formato ESTRICTO: la "
+        "PRIMERA línea es el título (sin prefijos ni comillas); de la segunda línea "
+        "en adelante, el contenido en pasos claros. En español."
+    )
+    lines = [
+        f"Título del ticket: {ticket.titulo}",
+        f"Descripción del cliente: {ticket.descripcion}",
+        "",
+        "Conversación:",
+    ]
+    msgs = list(ticket.messages.select_related("sender").order_by("created_at"))
+    for m in msgs:
+        lines.append(f"- {m.sender.username}: {m.content}")
+    if not msgs:
+        lines.append("(sin mensajes)")
+    lines.append("")
+    lines.append("Escribí el artículo de KB (título en la primera línea, luego el cuerpo).")
+    return system, "\n".join(lines)
+
+
+def suggest_kb_article(ticket):
+    """Genera (title, body) para un artículo de KB desde el ticket, o None si la
+    respuesta viene vacía. Puede propagar excepciones del gateway."""
+    from . import gateway
+    system, user_prompt = build_kb_suggestion_prompt(ticket)
+    raw = (gateway.generate(system=system, user_prompt=user_prompt, tier="quality") or "").strip()
+    if not raw:
+        return None
+    parts = raw.split("\n", 1)
+    title = parts[0].strip().lstrip("#").strip().strip('"')[:200]
+    body = parts[1].strip() if len(parts) > 1 else ""
+    if not title:
+        return None
+    return title, body
