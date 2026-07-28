@@ -1,8 +1,18 @@
 # backend/metrics/services.py
+import re
 from datetime import timedelta
 
 from django.db.models import Avg, Count, F, Q
 from django.utils import timezone
+
+# Stopwords mínimas en español para el conteo de temas recurrentes.
+_THEME_STOP = {
+    "para", "pero", "porque", "cuando", "donde", "como", "esta", "este", "esto",
+    "esos", "esas", "una", "unos", "unas", "con", "sin", "los", "las", "del",
+    "que", "por", "mas", "muy", "sus", "hay", "son", "fue", "era", "nos", "les",
+    "sigue", "sigo", "nuevamente", "problema", "problemas", "ticket", "tickets",
+    "ayuda", "hola", "buenas", "gracias", "favor", "necesito", "quiero", "puedo",
+}
 
 
 def _parse_window(request):
@@ -123,3 +133,29 @@ def technician_ranking(qs, cal):
         })
     result.sort(key=lambda x: (x["sla_pct"] is None, -(x["sla_pct"] or 0)))
     return result
+
+
+def recurring_themes(qs, limit=8):
+    """Temas recurrentes: palabras más frecuentes en título+descripción de los
+    tickets de la ventana (para el 'qué rompe más'). Excluye stopwords y ruido."""
+    counts = {}
+    for titulo, descripcion in qs.values_list("titulo", "descripcion"):
+        for tok in re.findall(r"\w+", f"{titulo} {descripcion}".lower()):
+            if len(tok) > 3 and tok not in _THEME_STOP:
+                counts[tok] = counts.get(tok, 0) + 1
+    top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]
+    return [{"term": t, "count": c} for t, c in top if c > 1]
+
+
+def insights_snapshot(org, window, cal):
+    """Resumen compacto y estructurado de la operación de soporte de la org, para
+    alimentar el análisis de IA (Fase 4). Reusa las agregaciones ya existentes."""
+    qs = windowed_tickets(window, org)
+    return {
+        "window_days": window,
+        "totals": volume_totals(qs),
+        "compliance": compliance(qs),
+        "avg_times": avg_times(qs, cal),
+        "csat": csat_summary(qs),
+        "themes": recurring_themes(qs),
+    }

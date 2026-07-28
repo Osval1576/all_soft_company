@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from tenancy.scoping import org_tickets
-from tickets_t.permissions import can_access_ticket
+from tickets_t.permissions import can_access_ticket, IsAdmin
 
 from . import services
 from .gateway import AiNotConfigured
@@ -74,3 +74,31 @@ class TicketAiSummaryView(_BaseTicketAiView):
 
     def run(self, ticket):
         return {"summary": services.summarize_ticket(ticket)}
+
+
+class InsightsView(APIView):
+    """POST /api/ai/insights/ -> {"insights": "...", "snapshot": {...}}
+
+    Análisis ejecutivo de la operación de soporte de la org (Fase 4): tendencias,
+    temas recurrentes y acciones recomendadas sobre métricas/CSAT. Solo ADMIN del
+    tenant + plan pago. 503 si la IA no está configurada.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        org = getattr(request, "organization", None)
+        if not services.ai_enabled(org):
+            return Response(
+                {"detail": "El análisis con IA está disponible en los planes Pro y Business.",
+                 "upsell": True},
+                status=status.HTTP_403_FORBIDDEN)
+
+        from metrics.services import insights_snapshot, _parse_window
+        from sla.calendar_engine import get_calendar
+        window = _parse_window(request)
+        snapshot = insights_snapshot(org, window, get_calendar(org))
+        try:
+            text = services.generate_insights(snapshot)
+        except AiNotConfigured:
+            return _NOT_CONFIGURED
+        return Response({"insights": text, "snapshot": snapshot})

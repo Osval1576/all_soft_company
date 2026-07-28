@@ -189,3 +189,34 @@ def answer_from_kb(query, articles):
     if not text or text.upper().startswith(NO_ANSWER):
         return None
     return text
+
+
+# --- Fase 4: insights de negocio sobre métricas/CSAT -------------------------
+
+def build_insights_prompt(snapshot):
+    """Arma (system, user_prompt) para el análisis ejecutivo a partir del snapshot
+    de métricas de la org."""
+    import json
+    system = (
+        "Sos un analista de una mesa de ayuda. A partir de las métricas de "
+        "soporte de una organización, redactás un análisis ejecutivo breve en "
+        "español para el administrador, con tres secciones y viñetas: "
+        "1) Tendencias clave, 2) Temas recurrentes, 3) 2 o 3 acciones concretas "
+        "recomendadas. Sé específico con los números del resumen. No inventes "
+        "datos que no estén en el resumen."
+    )
+    user_prompt = (
+        "Métricas del período (JSON):\n"
+        + json.dumps(snapshot, ensure_ascii=False, default=str)
+        + "\n\nRedactá el análisis para el administrador."
+    )
+    return system, user_prompt
+
+
+def generate_insights(snapshot):
+    """Genera el análisis ejecutivo a partir del snapshot. Puede propagar
+    excepciones del gateway (el llamador decide el fallback)."""
+    from . import gateway
+    system, user_prompt = build_insights_prompt(snapshot)
+    model = getattr(settings, "AI_INSIGHTS_MODEL", None)  # None -> usa AI_DRAFT_MODEL
+    return gateway.generate(system=system, user_prompt=user_prompt, max_tokens=1024, model=model)

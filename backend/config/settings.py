@@ -187,6 +187,8 @@ AI_SENTIMENT_MODEL = _env("AI_SENTIMENT_MODEL", "claude-haiku-4-5")
 # Modelo de deflección/RAG (3B): tarea de generación con contexto de la KB;
 # por defecto el mismo que los borradores (claude-opus-4-8), bajable vía env.
 AI_DEFLECT_MODEL = _env("AI_DEFLECT_MODEL", "claude-opus-4-8")
+# Modelo de insights de negocio (Fase 4): análisis ejecutivo de métricas.
+AI_INSIGHTS_MODEL = _env("AI_INSIGHTS_MODEL", "claude-opus-4-8")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -6,6 +6,7 @@ from rest_framework.test import APIClient
 
 from tenancy.testing import create_org
 from tickets_t.models import Ticket, TicketMessage
+from ai.gateway import AiNotConfigured
 
 User = get_user_model()
 
@@ -280,3 +281,67 @@ class AiSentimentEscalationTests(TestCase):
         self.ticket.refresh_from_db()
         self.assertIsNone(result)
         self.assertEqual(self.ticket.prioridad, "MEDIUM")
+
+
+class AiInsightsTests(TestCase):
+    """Fase 4 — insights de negocio sobre métricas/CSAT."""
+
+    URL = "/api/ai/insights/"
+
+    def setUp(self):
+        self.org = create_org("AIINS")  # Business por defecto
+        self.admin = User.objects.create_user("ins_admin", role="ADMIN",
+                                               organization=self.org, is_active=True)
+        self.agent = User.objects.create_user("ins_agent", role="AGENT",
+                                               organization=self.org, is_active=True)
+        self.customer = User.objects.create_user("ins_cust", role="CUSTOMER",
+                                                  organization=self.org, is_active=True)
+        for i in range(3):
+            Ticket.objects.create(
+                reference=f"INS-{i}", titulo="Problema con el pago",
+                descripcion="El pago falló nuevamente en el checkout.",
+                creado_por=self.customer, organization=self.org, estado="OPEN")
+        self.c = APIClient()
+
+    @patch("ai.gateway.generate", return_value="- Tendencia: subieron los tickets de pago.")
+    def test_admin_gets_insights_with_themes(self, mock_gen):
+        self.c.force_authenticate(self.admin)
+        r = self.c.post(self.URL)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.data["insights"])
+        terms = [t["term"] for t in r.data["snapshot"]["themes"]]
+        self.assertIn("pago", terms)
+        self.assertEqual(r.data["snapshot"]["totals"]["total"], 3)
+        # el prompt lleva el snapshot (con los totales)
+        prompt = mock_gen.call_args.kwargs["user_prompt"]
+        self.assertIn("total", prompt)
+
+    @patch("ai.gateway.generate", return_value="x")
+    def test_agent_forbidden(self, mock_gen):
+        self.c.force_authenticate(self.agent)
+        self.assertEqual(self.c.post(self.URL).status_code, 403)
+        mock_gen.assert_not_called()
+
+    @patch("ai.gateway.generate", return_value="x")
+    def test_customer_forbidden(self, mock_gen):
+        self.c.force_authenticate(self.customer)
+        self.assertEqual(self.c.post(self.URL).status_code, 403)
+        mock_gen.assert_not_called()
+
+    @patch("ai.gateway.generate", return_value="x")
+    def test_free_plan_forbidden_with_upsell(self, mock_gen):
+        from billing.models import Plan
+        from billing.testing import seed_plans
+        seed_plans()
+        self.org.subscription.plan = Plan.objects.get(key="free")
+        self.org.subscription.save()
+        self.c.force_authenticate(self.admin)
+        r = self.c.post(self.URL)
+        self.assertEqual(r.status_code, 403)
+        self.assertTrue(r.data.get("upsell"))
+        mock_gen.assert_not_called()
+
+    @patch("ai.gateway.generate", side_effect=AiNotConfigured("no key"))
+    def test_not_configured_returns_503(self, mock_gen):
+        self.c.force_authenticate(self.admin)
+        self.assertEqual(self.c.post(self.URL).status_code, 503)

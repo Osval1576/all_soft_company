@@ -14,6 +14,20 @@
       <div v-else-if="loading" class="state">Cargando…</div>
 
       <template v-else-if="data">
+        <section class="insights">
+          <div class="insights-head">
+            <span class="insights-title">✨ Análisis con IA</span>
+            <button class="insights-btn" :disabled="insightsLoading" @click="loadInsights">
+              {{ insightsLoading ? "Analizando…" : (insights ? "Regenerar" : "Analizar período") }}
+            </button>
+          </div>
+          <div v-if="insightsError" class="insights-error">{{ insightsError }}</div>
+          <p v-else-if="insights" class="insights-body">{{ insights }}</p>
+          <p v-else class="insights-hint">
+            Generá un resumen ejecutivo con tendencias, temas recurrentes y acciones recomendadas para este período.
+          </p>
+        </section>
+
         <div class="tiles">
           <MetricTile label="Tickets" :value="fmtNum(data.totals.total)" :hint="`${data.totals.open} abiertos`" />
           <MetricTile label="SLA 1ª respuesta" :value="fmtPct(data.compliance.first_response)" />
@@ -45,12 +59,18 @@ import TrendLine from "../../components/metrics/TrendLine.vue";
 import CsatBars from "../../components/metrics/CsatBars.vue";
 import TechRankingTable from "../../components/metrics/TechRankingTable.vue";
 import { getAdminMetrics } from "../../api/metrics.api.js";
+import { getInsights } from "../../api/ai.api.js";
 import { fmtPct, fmtMin, fmtNum } from "../../utils/metricsFormat.js";
 
 const window = ref(30);
 const data = ref(null);
 const loading = ref(true);
 const error = ref(false);
+
+// Fase 4: análisis con IA del período.
+const insights = ref("");
+const insightsLoading = ref(false);
+const insightsError = ref("");
 
 async function load() {
   loading.value = true; error.value = false;
@@ -59,7 +79,24 @@ async function load() {
   finally { loading.value = false; }
 }
 
-watch(window, load);
+async function loadInsights() {
+  if (insightsLoading.value) return;
+  insightsLoading.value = true;
+  insightsError.value = "";
+  try {
+    const res = await getInsights(window.value);
+    insights.value = res.insights || "";
+  } catch (e) {
+    const d = e?.response?.data;
+    insightsError.value = d?.upsell
+      ? "El análisis con IA está disponible en los planes Pro y Business."
+      : d?.detail || "No se pudo generar el análisis.";
+  } finally {
+    insightsLoading.value = false;
+  }
+}
+
+watch(window, () => { insights.value = ""; insightsError.value = ""; load(); });
 onMounted(load);
 </script>
 
@@ -72,4 +109,50 @@ onMounted(load);
 .retry { color: var(--accent); text-decoration: underline; margin-left: 6px; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.insights {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r);
+  padding: 16px 18px;
+}
+.insights-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.insights-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+[data-theme="dark"] .insights-title { color: var(--accent-2); }
+.insights-btn {
+  padding: 7px 14px;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+}
+.insights-btn:hover:not(:disabled) { background: var(--accent-hover); }
+.insights-btn:disabled { opacity: .55; cursor: not-allowed; }
+.insights-body {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+.insights-hint { margin: 10px 0 0; font-size: 12px; color: var(--text-3); line-height: 1.5; }
+.insights-error {
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  background: var(--c-urgent-bg);
+  color: var(--c-urgent);
+  font-size: 12px;
+}
 </style>
