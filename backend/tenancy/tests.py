@@ -110,6 +110,7 @@ class RawQuerysetGuardTests(TestCase):
     ALLOWED = {
         "tenancy/scoping.py",            # fuente unica
         "tickets_t/serializers.py",      # contador de referencia por prefijo (org-scoped por slug)
+        "tickets_t/creation.py",         # helper de creacion/referencia (org explicita / scoped por slug)
     }
 
     def test_sin_ticket_objects_crudo_fuera_del_allowlist(self):

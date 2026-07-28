@@ -107,5 +107,59 @@ Sin esto, ninguna feature es sostenible.
 
 ---
 
+## Estado (2026-07-28)
+✅ Fase 0 (gateway) · ✅ Fase 1 (1A borrador + 1B triage) · ✅ Fase 2 (2A resumen + 2B sentimiento) · ✅ Fase 3 (3A KB + 3B deflección RAG) · ✅ Fase 4 (insights) · ✅ **Gateway multi-proveedor** (Claude/Gemini/OpenAI, elegible por despliegue).
+
+---
+
+## Fase 5 — Diferenciadores de mercado (post-wedge)
+El wedge de IA está completo; estos cuatro son las apuestas para **destacar** en el
+mercado LATAM/PyME. Orden de construcción recomendado (1→4):
+
+### 5.1) Omnicanal donde están los clientes ⭐ (empezar acá)
+- **Qué**: recibir/responder por los canales reales de LATAM. **WhatsApp** primero
+  (Cloud API de Meta), luego **email-to-ticket** e **Instagram/Messenger DM**, y un
+  **widget embebible** para la web del cliente.
+- **Combo clave**: la deflección RAG (3B) corre sobre WhatsApp/widget → el bot
+  responde con la KB y escala a humano solo si hace falta.
+- **Arquitectura**: app `inbound` con abstracción de canal (ingesta por webhook →
+  ticket + hilo por contacto → deflección → respuesta saliente). Las credenciales
+  del canal (Meta, SMTP) son config de despliegue, igual que las keys de IA.
+- **Éxito**: % de conversaciones iniciadas fuera del portal; deflección por canal.
+
+### 5.2) KB que se auto-alimenta (flywheel)
+- **Qué**: al resolver un ticket, la IA propone un artículo de KB a partir del hilo
+  (borrador que el admin aprueba). La KB crece sola → mejor deflección → menos tickets.
+- **Dónde**: hook al pasar a RESOLVED → `ai/` genera título+cuerpo → cola de
+  "sugerencias de KB" en el admin. Cierra el loop 3A↔3B.
+- **Modelo**: clase quality. **Éxito**: artículos publicados desde sugerencias;
+  impacto en tasa de deflección.
+
+### 5.3) Multilingüe real
+- **Qué**: detectar el idioma del cliente; el agente escribe en español y la IA
+  traduce ida y vuelta. Atender clientes en inglés/portugués sin equipo bilingüe.
+- **Dónde**: pipeline de mensajes → `ai/` (detección + traducción). Se apoya en el
+  gateway multi-proveedor existente.
+- **Éxito**: conversaciones cross-idioma atendidas; CSAT en esos casos.
+
+### 5.4) Posicionamiento "IA sin lock-in"
+- **Qué**: hacer explícito en pricing/landing que el cliente elige Claude/Gemini/
+  OpenAI y trae su propia key (ya construido en el gateway multi-proveedor).
+  Transparencia + control de costos de IA = argumento de venta real vs incumbentes.
+- **Esfuerzo**: casi nulo (copy + una sección en la landing/pricing).
+
+### Moat de confianza (transversal a Fase 5)
+- Cumplimiento y **residencia de datos** (LGPD Brasil, Ley 25.326 Argentina), log de
+  auditoría, exportación/borrado por cliente. Apoyarse en la auditoría de seguridad
+  ya hecha (cyber-neo).
+- **Predicción de incumplimiento de SLA**: avisar *antes* de romper el SLA (sobre
+  los datos de `sla`), no después.
+
+### Integraciones table-stakes
+Slack/Teams, Zapier/Make, webhooks salientes, PWA/app móvil para agentes.
+
+---
+
 ## Fuera de este roadmap (pero clave para el wedge)
-- **Email-to-ticket** e **integración de WhatsApp**: no son IA, pero son los gaps que completan el posicionamiento LATAM. Ver `.agents/product-marketing.md` (secciones Differentiation y Gaps). Sugerencia: correrlos **en paralelo** a la Fase 1.
+- **Email-to-ticket** e **integración de WhatsApp**: ahora incorporados como **Fase
+  5.1 (omnicanal)**. Ver `.agents/product-marketing.md` (Differentiation y Gaps).

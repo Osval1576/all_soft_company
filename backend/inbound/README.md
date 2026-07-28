@@ -1,0 +1,40 @@
+# Omnicanal — ingesta de canales externos (Fase 5.1)
+
+App `inbound`: recibe mensajes de canales externos (WhatsApp primero) y los
+convierte en tickets, con hilo por contacto y **deflección RAG** (reusa la KB /
+3B) para responder solo, escalando a humano cuando la KB no alcanza.
+
+## Piezas
+- `models.ChannelAccount`: mapea la cuenta del canal (p. ej. el `phone_number_id`
+  de WhatsApp) → organización. La ingesta usa esto para saber a qué tenant va el
+  mensaje. Se administra en `/api/admin/inbound/accounts/` (ADMIN del tenant).
+- `models.ChannelThread`: hilo del contacto → ticket actual (para que los mensajes
+  sucesivos caigan en el mismo ticket mientras siga abierto).
+- `services.handle_inbound_message`: núcleo agnóstico del canal (org → contacto →
+  ticket → mensaje → sentimiento 2B → deflección 3B). Devuelve la respuesta
+  automática o `None` (queda para un agente).
+- `whatsapp.py`: adapter de WhatsApp Cloud API (parseo del webhook, verificación de
+  firma, envío saliente). Único lugar que conoce el formato de Meta.
+- `views.WhatsAppWebhookView`: webhook `GET` (verificación) + `POST` (mensajes).
+
+## Configurar WhatsApp (Cloud API de Meta)
+1. En Meta: creá una app de WhatsApp Business, obtené el número emisor y su
+   `phone_number_id`, un access token y el app secret.
+2. Variables de entorno del backend (ver `.env.example`):
+   ```
+   WHATSAPP_VERIFY_TOKEN=...   # el que ponés en Meta al configurar el webhook
+   WHATSAPP_TOKEN=...          # access token del Graph API
+   WHATSAPP_PHONE_NUMBER_ID=...
+   WHATSAPP_APP_SECRET=...     # valida X-Hub-Signature-256 (recomendado)
+   ```
+3. En Meta, configurá el webhook apuntando a `https://TU_DOMINIO/api/inbound/whatsapp/`
+   (verificación por `GET` con `WHATSAPP_VERIFY_TOKEN`).
+4. Registrá la cuenta del tenant: `POST /api/admin/inbound/accounts/`
+   `{ "channel": "whatsapp", "external_id": "<phone_number_id>" }` (como ADMIN).
+
+## Notas / siguientes pasos
+- El procesamiento es inline en el webhook (la llamada de IA suma latencia). Para
+  volumen alto conviene una cola/worker (deja el 200 inmediato y procesa aparte).
+- Registrar la auto-respuesta como mensaje del ticket (hoy solo se envía por el
+  canal) y opción de auto-resolver el ticket cuando la deflección lo cierra.
+- Próximos canales sobre la misma abstracción: email-to-ticket, widget web, IG/Messenger.

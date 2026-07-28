@@ -39,3 +39,9 @@ def org_kb(org):
     from kb.models import Article
     qs = Article.objects.all()
     return qs.filter(organization=org) if org is not None else qs.none()
+
+
+def org_channel_accounts(org):
+    from inbound.models import ChannelAccount
+    qs = ChannelAccount.objects.all()
+    return qs.filter(organization=org) if org is not None else qs.none()
