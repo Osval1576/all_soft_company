@@ -168,27 +168,16 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # -----------------------
-# IA (wedge Fase 1)
+# IA (wedge de IA)
 # -----------------------
-# Flag global de features de IA. En prod requiere además ANTHROPIC_API_KEY.
+# Flag global de features de IA. En prod requiere además la key del proveedor.
 AI_FEATURES_ENABLED = _env_bool("AI_FEATURES_ENABLED", DEBUG)
-# Modelo por defecto para generación (borradores). claude-opus-4-8 por defecto;
-# se puede cambiar vía env (p. ej. claude-sonnet-5 para reducir costo).
-AI_DRAFT_MODEL = _env("AI_DRAFT_MODEL", "claude-opus-4-8")
-# Modelo de clasificación (auto-triage 1B): tarea corta y de alto volumen, se
-# usa un modelo Haiku por costo/latencia. Configurable vía env.
-AI_TRIAGE_MODEL = _env("AI_TRIAGE_MODEL", "claude-haiku-4-5")
-# Modelo de resumen (2A): tarea de generación; por defecto el mismo que los
-# borradores (claude-opus-4-8). Se puede bajar a Sonnet vía env por costo.
-AI_SUMMARY_MODEL = _env("AI_SUMMARY_MODEL", "claude-opus-4-8")
-# Modelo de análisis de sentimiento (2B): clasificación de alto volumen sobre
-# cada mensaje del cliente, modelo Haiku por costo/latencia.
-AI_SENTIMENT_MODEL = _env("AI_SENTIMENT_MODEL", "claude-haiku-4-5")
-# Modelo de deflección/RAG (3B): tarea de generación con contexto de la KB;
-# por defecto el mismo que los borradores (claude-opus-4-8), bajable vía env.
-AI_DEFLECT_MODEL = _env("AI_DEFLECT_MODEL", "claude-opus-4-8")
-# Modelo de insights de negocio (Fase 4): análisis ejecutivo de métricas.
-AI_INSIGHTS_MODEL = _env("AI_INSIGHTS_MODEL", "claude-opus-4-8")
+# Proveedor de IA elegido por el despliegue: "anthropic" (Claude), "gemini"
+# (Google) u "openai" (ChatGPT). El gateway (ai/gateway.py) enruta según esto y
+# lee la key correspondiente del entorno (ANTHROPIC_API_KEY / GEMINI_API_KEY /
+# OPENAI_API_KEY). El modelo por tarea se resuelve por proveedor+tier dentro del
+# gateway, con override por env (AI_<PROVIDER>_<TIER>_MODEL). Ver README.
+AI_PROVIDER = _env("AI_PROVIDER", "anthropic")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

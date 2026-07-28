@@ -11,4 +11,8 @@ channels-redis==4.3.0
 django-redis==7.0.0
 redis==8.0.1
 stripe==15.3.1
+# Proveedores de IA (multi-proveedor por AI_PROVIDER; import perezoso en el
+# gateway: solo hace falta el SDK del proveedor elegido en el despliegue).
 anthropic
+google-genai
+openai

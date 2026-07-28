@@ -1,16 +1,62 @@
+import os
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APIClient
 
 from tenancy.testing import create_org
 from tickets_t.models import Ticket, TicketMessage
+from ai import gateway
 from ai.gateway import AiNotConfigured
 
 User = get_user_model()
 
 DRAFT = "Hola, gracias por escribir. Probá limpiar la caché y contanos si sigue."
+
+
+class GatewayDispatchTests(SimpleTestCase):
+    """Gateway multi-proveedor: elección de proveedor/modelo por env, sin DB."""
+
+    def test_provider_aliases(self):
+        cases = [("claude", "anthropic"), ("anthropic", "anthropic"),
+                 ("google", "gemini"), ("gemini", "gemini"),
+                 ("chatgpt", "openai"), ("gpt", "openai"), ("openai", "openai")]
+        for raw, canon in cases:
+            with patch.dict(os.environ, {"AI_PROVIDER": raw}):
+                self.assertEqual(gateway._provider(), canon)
+
+    def test_model_defaults_and_env_override(self):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AI_GEMINI_QUALITY_MODEL", None)
+            os.environ.pop("AI_ANTHROPIC_FAST_MODEL", None)
+            self.assertEqual(gateway._model_for("gemini", "quality"), "gemini-flash-latest")
+            self.assertEqual(gateway._model_for("anthropic", "fast"), "claude-haiku-4-5")
+        with patch.dict(os.environ, {"AI_OPENAI_QUALITY_MODEL": "gpt-custom"}):
+            self.assertEqual(gateway._model_for("openai", "quality"), "gpt-custom")
+
+    def test_generate_dispatches_by_provider_and_tier(self):
+        with patch.dict(os.environ, {"AI_PROVIDER": "gemini"}), \
+             patch("ai.gateway._gemini", return_value="ok") as mg, \
+             patch("ai.gateway._anthropic") as ma, \
+             patch("ai.gateway._openai") as mo:
+            out = gateway.generate(system="s", user_prompt="u", tier="fast")
+        self.assertEqual(out, "ok")
+        ma.assert_not_called()
+        mo.assert_not_called()
+        # el adapter recibe el modelo resuelto por (proveedor, tier)
+        self.assertEqual(mg.call_args.args[2], "gemini-flash-lite-latest")
+
+    def test_missing_key_raises_not_configured(self):
+        with patch.dict(os.environ, {"AI_PROVIDER": "openai"}, clear=False):
+            os.environ.pop("OPENAI_API_KEY", None)
+            with self.assertRaises(AiNotConfigured):
+                gateway.generate(system="s", user_prompt="u", tier="quality")
+
+    def test_unknown_provider_raises(self):
+        with patch.dict(os.environ, {"AI_PROVIDER": "llama-local"}):
+            with self.assertRaises(AiNotConfigured):
+                gateway.generate(system="s", user_prompt="u")
 
 
 def _url(ticket_id):
