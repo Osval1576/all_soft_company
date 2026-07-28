@@ -184,6 +184,9 @@ AI_SUMMARY_MODEL = _env("AI_SUMMARY_MODEL", "claude-opus-4-8")
 # Modelo de análisis de sentimiento (2B): clasificación de alto volumen sobre
 # cada mensaje del cliente, modelo Haiku por costo/latencia.
 AI_SENTIMENT_MODEL = _env("AI_SENTIMENT_MODEL", "claude-haiku-4-5")
+# Modelo de deflección/RAG (3B): tarea de generación con contexto de la KB;
+# por defecto el mismo que los borradores (claude-opus-4-8), bajable vía env.
+AI_DEFLECT_MODEL = _env("AI_DEFLECT_MODEL", "claude-opus-4-8")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

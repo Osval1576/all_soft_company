@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -8,6 +10,7 @@ from kb.models import Article
 User = get_user_model()
 
 BASE = "/api/admin/kb/articles/"
+DEFLECT = "/api/kb/deflect/"
 
 
 class KbAdminTests(TestCase):
@@ -100,3 +103,103 @@ class KbAdminTests(TestCase):
 
     def test_anonymous_unauthorized(self):
         self.assertIn(self.c.get(BASE).status_code, (401, 403))
+
+
+class KbSearchTests(TestCase):
+    """Retrieval por relevancia sobre la KB publicada de la org."""
+
+    def setUp(self):
+        self.org = create_org("KBSRCH")
+        Article.objects.create(organization=self.org, title="Restablecer contraseña",
+                               body="Andá a Ajustes y tocá Restablecer.", is_published=True)
+        Article.objects.create(organization=self.org, title="Configurar el panel",
+                               body="El panel se configura en preferencias.", is_published=True)
+        Article.objects.create(organization=self.org, title="Borrador oculto",
+                               body="contraseña secreta interna", is_published=False)
+
+    def test_finds_published_by_relevance(self):
+        from kb.search import search_articles
+        res = search_articles(self.org, "cómo restablezco mi contraseña")
+        self.assertTrue(res)
+        self.assertEqual(res[0].title, "Restablecer contraseña")
+
+    def test_excludes_unpublished(self):
+        from kb.search import search_articles
+        res = search_articles(self.org, "contraseña secreta interna")
+        self.assertNotIn("Borrador oculto", [a.title for a in res])
+
+    def test_scoped_to_org(self):
+        from kb.search import search_articles
+        other = create_org("KBSRCH2")
+        Article.objects.create(organization=other, title="Restablecer contraseña",
+                               body="ajeno", is_published=True)
+        res = search_articles(self.org, "restablecer contraseña")
+        for a in res:
+            self.assertEqual(a.organization_id, self.org.id)
+
+    def test_no_match_is_empty(self):
+        from kb.search import search_articles
+        self.assertEqual(search_articles(self.org, "zxqw nonexistent topic"), [])
+
+
+class KbDeflectTests(TestCase):
+    """Agente de deflección (RAG) sobre la KB publicada de la org (3B)."""
+
+    def setUp(self):
+        self.org = create_org("KBDEF")  # Business por defecto
+        self.customer = User.objects.create_user("def_cust", role="CUSTOMER",
+                                                  organization=self.org, is_active=True)
+        Article.objects.create(
+            organization=self.org, title="Restablecer contraseña",
+            body="Andá a Ajustes → Seguridad y tocá Restablecer.", is_published=True)
+        self.c = APIClient()
+        self.c.force_authenticate(self.customer)
+
+    @patch("ai.gateway.generate", return_value="Andá a Ajustes → Seguridad y restablecé.")
+    def test_resolved_with_sources(self, mock_gen):
+        r = self.c.post(DEFLECT, {"query": "cómo restablezco mi contraseña"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.data["available"])
+        self.assertTrue(r.data["resolved"])
+        self.assertTrue(r.data["answer"])
+        self.assertEqual(r.data["sources"][0]["title"], "Restablecer contraseña")
+        # el prompt lleva el cuerpo del artículo como contexto
+        prompt = mock_gen.call_args.kwargs["user_prompt"]
+        self.assertIn("Ajustes → Seguridad", prompt)
+
+    @patch("ai.gateway.generate", return_value="NO_SE")
+    def test_unresolved_when_model_says_no(self, mock_gen):
+        r = self.c.post(DEFLECT, {"query": "cómo restablezco mi contraseña"}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.data["resolved"])
+        self.assertIsNone(r.data["answer"])
+
+    @patch("ai.gateway.generate")
+    def test_no_articles_skips_ai(self, mock_gen):
+        r = self.c.post(DEFLECT, {"query": "zxqw nonexistent topic"}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.data["resolved"])
+        mock_gen.assert_not_called()
+
+    @patch("ai.gateway.generate", return_value="algo")
+    def test_free_plan_unavailable(self, mock_gen):
+        from billing.models import Plan
+        from billing.testing import seed_plans
+        seed_plans()
+        self.org.subscription.plan = Plan.objects.get(key="free")
+        self.org.subscription.save()
+        r = self.c.post(DEFLECT, {"query": "restablecer contraseña"}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.data["available"])
+        self.assertFalse(r.data["resolved"])
+        mock_gen.assert_not_called()
+
+    @patch("ai.gateway.generate", side_effect=RuntimeError("boom"))
+    def test_ai_failure_is_graceful(self, mock_gen):
+        r = self.c.post(DEFLECT, {"query": "restablecer contraseña"}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.data["resolved"])
+
+    def test_requires_query(self):
+        r = self.c.post(DEFLECT, {}, format="json")
+        self.assertEqual(r.status_code, 400)

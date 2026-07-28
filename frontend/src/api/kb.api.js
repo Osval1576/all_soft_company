@@ -21,3 +21,10 @@ export async function updateArticle(id, data) {
 export async function deleteArticle(id) {
   await http.delete(`${BASE}${id}/`);
 }
+
+// Fase 3B — deflección: intenta resolver la consulta con la KB antes de abrir
+// ticket. Devuelve { available, resolved, answer, sources }.
+export async function deflect(query) {
+  const res = await http.post("/api/kb/deflect/", { query });
+  return res.data;
+}

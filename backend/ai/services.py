@@ -150,3 +150,42 @@ def assess_sentiment_priority(ticket, message_text):
     raw = gateway.generate(system=system, user_prompt=user_prompt, max_tokens=8, model=model)
     val = (raw or "").strip().upper()
     return val if val in VALID_PRIORITIES else None
+
+
+# --- Fase 3B: deflección (RAG sobre la KB) -----------------------------------
+
+# Sentinela que devuelve el modelo cuando los artículos no alcanzan para responder.
+NO_ANSWER = "NO_SE"
+
+
+def build_deflection_prompt(query, articles):
+    """Arma (system, user_prompt) para responder la consulta usando SOLO los
+    artículos de la KB provistos."""
+    system = (
+        "Sos un asistente de soporte. Respondés la consulta del cliente usando "
+        "EXCLUSIVAMENTE la información de los artículos provistos. No inventes ni "
+        "uses conocimiento externo. Si los artículos no contienen la respuesta, "
+        f"respondés exactamente '{NO_ANSWER}' y nada más. Respondé en español, "
+        "claro y breve."
+    )
+    parts = [f"# {a.title}\n{a.body}" for a in articles]
+    context = "\n\n".join(parts) if parts else "(sin artículos)"
+    user_prompt = (
+        f"Artículos de la base de conocimiento:\n{context}\n\n"
+        f"Consulta del cliente: {query}\n\nRespuesta:"
+    )
+    return system, user_prompt
+
+
+def answer_from_kb(query, articles):
+    """Genera una respuesta a partir de los artículos. Devuelve el texto, o None
+    si el modelo indica que la KB no alcanza (sentinela NO_SE). Puede propagar
+    excepciones del gateway: el llamador decide la degradación."""
+    from . import gateway
+    system, user_prompt = build_deflection_prompt(query, articles)
+    model = getattr(settings, "AI_DEFLECT_MODEL", None)  # None -> usa AI_DRAFT_MODEL
+    raw = gateway.generate(system=system, user_prompt=user_prompt, model=model)
+    text = (raw or "").strip()
+    if not text or text.upper().startswith(NO_ANSWER):
+        return None
+    return text
