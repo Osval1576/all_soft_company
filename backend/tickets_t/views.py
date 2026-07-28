@@ -116,6 +116,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             "asignado_a_id": inst.asignado_a_id,
             "prioridad": inst.prioridad,
         }
+        became_resolved = False
         with transaction.atomic():
             ticket = serializer.save()
             actor = self.request.user
@@ -134,6 +135,16 @@ class TicketViewSet(viewsets.ModelViewSet):
                     self._emit(ticket, "assigned", actor, {"to_user_id": new["asignado_a_id"]})
             if old["prioridad"] != new["prioridad"]:
                 self._emit(ticket, "priority_changed", actor, {"from": old["prioridad"], "to": new["prioridad"]})
+            became_resolved = old["estado"] != "RESOLVED" and new["estado"] == "RESOLVED"
+
+        # 5.2: al resolver, la IA sugiere un artículo de KB (fuera de la transacción,
+        # resiliente; nunca bloquea el cambio de estado).
+        if became_resolved:
+            try:
+                from kb.suggestions import maybe_suggest_from_ticket
+                maybe_suggest_from_ticket(ticket)
+            except Exception:
+                logger.warning("sugerencia de KB falló para ticket %s", ticket.id, exc_info=True)
 
     # ---- messages (existing) ----
     @action(detail=True, methods=["get"])

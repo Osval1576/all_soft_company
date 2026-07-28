@@ -52,3 +52,32 @@ class Article(models.Model):
 
     def __str__(self):
         return f"[{self.organization_id}] {self.title}"
+
+
+class ArticleSuggestion(models.Model):
+    """Sugerencia de artículo de KB generada por IA a partir de un ticket resuelto
+    (Fase 5.2, KB auto-alimentada). El admin la revisa/edita y la acepta (crea un
+    Article publicado) o la descarta. Cierra el loop 3A↔3B: la KB crece sola."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pendiente"
+        ACCEPTED = "accepted", "Aceptada"
+        DISMISSED = "dismissed", "Descartada"
+
+    organization = models.ForeignKey(
+        "tenancy.Organization", on_delete=models.CASCADE, related_name="kb_suggestions")
+    title = models.CharField(max_length=200)
+    body = models.TextField(blank=True)
+    source_ticket = models.ForeignKey(
+        "tickets_t.Ticket", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="kb_suggestions")
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["organization", "status"])]
+
+    def __str__(self):
+        return f"[{self.organization_id}] sugerencia: {self.title[:40]}"
