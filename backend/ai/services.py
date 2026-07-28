@@ -47,7 +47,7 @@ def draft_reply(ticket):
     """Genera un borrador de respuesta para el ticket (llama al gateway de IA)."""
     from . import gateway
     system, user_prompt = build_draft_prompt(ticket)
-    return gateway.generate(system=system, user_prompt=user_prompt)
+    return gateway.generate(system=system, user_prompt=user_prompt, tier="quality")
 
 
 # --- Fase 2A: resumen de conversación ----------------------------------------
@@ -81,8 +81,7 @@ def summarize_ticket(ticket):
     """Genera un resumen del hilo del ticket (llama al gateway de IA)."""
     from . import gateway
     system, user_prompt = build_summary_prompt(ticket)
-    model = getattr(settings, "AI_SUMMARY_MODEL", None)
-    return gateway.generate(system=system, user_prompt=user_prompt, model=model)
+    return gateway.generate(system=system, user_prompt=user_prompt, tier="quality")
 
 
 # --- Fase 1B: auto-triage de prioridad ---------------------------------------
@@ -115,8 +114,7 @@ def triage_priority(ticket):
     """
     from . import gateway
     system, user_prompt = build_triage_prompt(ticket)
-    model = getattr(settings, "AI_TRIAGE_MODEL", "claude-haiku-4-5")
-    raw = gateway.generate(system=system, user_prompt=user_prompt, max_tokens=8, model=model)
+    raw = gateway.generate(system=system, user_prompt=user_prompt, max_tokens=8, tier="fast")
     val = (raw or "").strip().upper()
     return val if val in VALID_PRIORITIES else None
 
@@ -146,8 +144,7 @@ def assess_sentiment_priority(ticket, message_text):
     None si la respuesta no es válida. Puede propagar excepciones del gateway."""
     from . import gateway
     system, user_prompt = build_sentiment_prompt(ticket, message_text)
-    model = getattr(settings, "AI_SENTIMENT_MODEL", "claude-haiku-4-5")
-    raw = gateway.generate(system=system, user_prompt=user_prompt, max_tokens=8, model=model)
+    raw = gateway.generate(system=system, user_prompt=user_prompt, max_tokens=8, tier="fast")
     val = (raw or "").strip().upper()
     return val if val in VALID_PRIORITIES else None
 
@@ -183,8 +180,7 @@ def answer_from_kb(query, articles):
     excepciones del gateway: el llamador decide la degradación."""
     from . import gateway
     system, user_prompt = build_deflection_prompt(query, articles)
-    model = getattr(settings, "AI_DEFLECT_MODEL", None)  # None -> usa AI_DRAFT_MODEL
-    raw = gateway.generate(system=system, user_prompt=user_prompt, model=model)
+    raw = gateway.generate(system=system, user_prompt=user_prompt, tier="quality")
     text = (raw or "").strip()
     if not text or text.upper().startswith(NO_ANSWER):
         return None
@@ -218,5 +214,4 @@ def generate_insights(snapshot):
     excepciones del gateway (el llamador decide el fallback)."""
     from . import gateway
     system, user_prompt = build_insights_prompt(snapshot)
-    model = getattr(settings, "AI_INSIGHTS_MODEL", None)  # None -> usa AI_DRAFT_MODEL
-    return gateway.generate(system=system, user_prompt=user_prompt, max_tokens=1024, model=model)
+    return gateway.generate(system=system, user_prompt=user_prompt, max_tokens=1024, tier="quality")
