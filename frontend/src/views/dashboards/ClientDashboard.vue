@@ -82,6 +82,31 @@
               </select>
             </div>
 
+            <div class="deflect">
+              <button
+                type="button"
+                class="btn-deflect"
+                :disabled="deflecting || !canDeflect"
+                @click="onDeflect"
+              >{{ deflecting ? "Buscando…" : "💡 Buscar en la base de conocimiento" }}</button>
+
+              <div v-if="deflection" class="deflect-panel" :class="{ 'deflect-panel--ok': deflection.resolved }">
+                <template v-if="deflection.resolved">
+                  <p class="deflect-answer">{{ deflection.answer }}</p>
+                  <ul v-if="deflection.sources.length" class="deflect-sources">
+                    <li v-for="s in deflection.sources" :key="s.id">📄 {{ s.title }}</li>
+                  </ul>
+                  <div class="deflect-actions">
+                    <button type="button" class="btn-resolved" @click="onResolved">Sí, resolvió mi problema</button>
+                    <span class="deflect-or">o seguí creando el ticket</span>
+                  </div>
+                </template>
+                <p v-else class="deflect-none">
+                  No encontramos un artículo que responda tu consulta. Creá el ticket y te ayudamos.
+                </p>
+              </div>
+            </div>
+
             <div v-if="formError" class="error-msg">{{ formError }}</div>
 
             <div class="modal-actions">
@@ -105,6 +130,7 @@ import StatusBadge from "../../components/StatusBadge.vue";
 import PriorityDot from "../../components/PriorityDot.vue";
 import SlaBadge from "../../components/tickets/SlaBadge.vue";
 import { listMyTickets, createTicket } from "../../api/tickets.api";
+import { deflect } from "../../api/kb.api";
 
 const tickets        = ref([]);
 const loadingTickets = ref(false);
@@ -115,6 +141,12 @@ const showModal  = ref(false);
 const submitting = ref(false);
 const formError  = ref("");
 const form       = ref({ titulo: "", descripcion: "", prioridad: "MEDIUM" });
+
+// 3B: deflección con la KB antes de crear el ticket.
+const deflecting = ref(false);
+const deflection = ref(null);
+const canDeflect = computed(() =>
+  (form.value.titulo.trim() + " " + form.value.descripcion.trim()).trim().length >= 5);
 
 const filtered = computed(() => {
   const q = search.value.toLowerCase();
@@ -146,10 +178,29 @@ async function load() {
 function openCreateModal() {
   form.value = { titulo: "", descripcion: "", prioridad: "MEDIUM" };
   formError.value = "";
+  deflection.value = null;
   showModal.value = true;
 }
 
 function closeModal() { showModal.value = false; }
+
+async function onDeflect() {
+  if (deflecting.value || !canDeflect.value) return;
+  deflecting.value = true;
+  deflection.value = null;
+  try {
+    const query = `${form.value.titulo} ${form.value.descripcion}`.trim();
+    const res = await deflect(query);
+    // available=false (plan sin IA) -> no mostramos nada, seguimos al ticket.
+    deflection.value = res.available ? res : { resolved: false, sources: [] };
+  } catch (_) {
+    deflection.value = { resolved: false, sources: [] };
+  } finally {
+    deflecting.value = false;
+  }
+}
+
+function onResolved() { closeModal(); }
 
 async function submitTicket() {
   if (!form.value.titulo.trim() || !form.value.descripcion.trim()) {
@@ -386,6 +437,45 @@ onMounted(load);
 }
 .btn-submit:hover:not(:disabled) { background: var(--accent-hover); }
 .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+
+.deflect { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 2px; }
+.btn-deflect {
+  align-self: flex-start;
+  padding: 7px 12px;
+  border-radius: var(--r-sm);
+  border: 0.5px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.btn-deflect:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.btn-deflect:disabled { opacity: .5; cursor: not-allowed; }
+.deflect-panel {
+  padding: 12px;
+  border: 0.5px solid var(--border);
+  border-left: 3px solid var(--text-3);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+.deflect-panel--ok { border-left-color: var(--accent); }
+.deflect-answer { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text); white-space: pre-wrap; }
+.deflect-sources { margin: 8px 0 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.deflect-sources li { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); }
+.deflect-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.btn-resolved {
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  background: var(--c-resolved, #10B981);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.deflect-or { font-size: 11px; color: var(--text-3); }
+.deflect-none { margin: 0; font-size: 12px; color: var(--text-3); line-height: 1.5; }
+
 .modal-enter-active, .modal-leave-active { transition: opacity .2s, transform .2s; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
 .modal-enter-from .modal, .modal-leave-to .modal { transform: scale(.96); }
