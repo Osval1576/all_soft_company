@@ -11,3 +11,9 @@ export async function summarizeTicket(ticketId) {
   const res = await http.post(`/api/ai/tickets/${ticketId}/summary/`);
   return res.data;
 }
+
+// Fase 4 — insights de negocio sobre métricas. Devuelve { insights, snapshot }.
+export async function getInsights(window) {
+  const res = await http.post(`/api/ai/insights/?window=${window || 30}`);
+  return res.data;
+}
