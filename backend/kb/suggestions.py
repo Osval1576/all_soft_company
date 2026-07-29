@@ -31,3 +31,11 @@ def maybe_suggest_from_ticket(ticket):
     return ArticleSuggestion.objects.create(
         organization=ticket.organization, title=title, body=body,
         source_ticket=ticket, status=ArticleSuggestion.Status.PENDING)
+
+
+def run_kb_suggestion(ticket_id):
+    """Entrypoint para ejecución async (toma id y re-fetchea)."""
+    from tickets_t.models import Ticket
+    t = Ticket.objects.filter(id=ticket_id).select_related("organization").first()
+    if t:
+        maybe_suggest_from_ticket(t)
