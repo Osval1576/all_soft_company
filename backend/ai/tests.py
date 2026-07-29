@@ -2,7 +2,7 @@ import os
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from rest_framework.test import APIClient
 
 from tenancy.testing import create_org
@@ -13,6 +13,45 @@ from ai.gateway import AiNotConfigured
 User = get_user_model()
 
 DRAFT = "Hola, gracias por escribir. Probá limpiar la caché y contanos si sigue."
+
+# Helpers para los tests de run_async / cola (necesitan ser de módulo para que
+# se resuelva su ruta punteada).
+_RESULTS = []
+
+
+def _append_result(x):
+    _RESULTS.append(x)
+
+
+def _noop_task(*args, **kwargs):
+    pass
+
+
+class RunAsyncQueueTests(SimpleTestCase):
+    """Ruteo de run_async: inline (tests) / Celery (prod) / dispatcher genérico."""
+
+    def test_inline_when_ai_async_false(self):
+        from config.background import run_async
+        box = []
+        run_async(box.append, "x")  # AI_ASYNC=False por defecto en tests
+        self.assertEqual(box, ["x"])
+
+    @override_settings(AI_ASYNC=True, AI_TASK_QUEUE="celery")
+    def test_enqueues_to_celery_when_configured(self):
+        from config.background import run_async
+        with patch("config.tasks.run_task.delay") as delay:
+            run_async(_noop_task, 5, x=1)
+        delay.assert_called_once()
+        path, args, kwargs = delay.call_args.args
+        self.assertTrue(path.endswith("ai.tests._noop_task"))
+        self.assertEqual(args, [5])
+        self.assertEqual(kwargs, {"x": 1})
+
+    def test_run_task_dispatcher_imports_and_calls(self):
+        from config.tasks import run_task
+        _RESULTS.clear()
+        run_task("ai.tests._append_result", ["hola"], {})
+        self.assertEqual(_RESULTS, ["hola"])
 
 
 class GatewayDispatchTests(SimpleTestCase):

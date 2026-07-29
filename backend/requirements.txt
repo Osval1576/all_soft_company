@@ -9,7 +9,12 @@ Pillow>=10.0
 django-cleanup>=8.0
 channels-redis==4.3.0
 django-redis==7.0.0
-redis==8.0.1
+# redis 6.x: celery[redis] valida <7. El proyecto usa Redis solo como cache/
+# channel-layer, donde 6.4 es estable (antes 8.0.1).
+redis==6.4.0
+# Cola de tareas para los hooks de IA async en producción (broker: Redis).
+# Opcional: sin AI_TASK_QUEUE=celery, el proyecto usa un thread daemon in-process.
+celery[redis]
 stripe==15.3.1
 # Proveedores de IA (multi-proveedor por AI_PROVIDER; import perezoso en el
 # gateway: solo hace falta el SDK del proveedor elegido en el despliegue).

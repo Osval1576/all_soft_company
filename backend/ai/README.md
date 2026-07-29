@@ -56,3 +56,21 @@ AI_OPENAI_FAST_MODEL=gpt-5.1-nano
 2. Registrarlo en `generate()`, en `_PROVIDER_ALIASES` y en `_MODEL_DEFAULTS`.
 
 Nada más cambia: services y views siguen llamando `gateway.generate(...)`.
+
+## Procesamiento async de los hooks (triage, sentimiento, KB, omnicanal)
+
+Los hooks fire-and-forget corren fuera del request vía `config/background.py::run_async`,
+en cascada:
+
+- `AI_ASYNC=false` (tests) → inline.
+- `AI_TASK_QUEUE=celery` (prod) → se encola en **Celery** (worker aparte, escala).
+- si no → **thread daemon** in-process (dev/single-process; sin worker).
+
+### Correr el worker de Celery (prod)
+```bash
+# broker por defecto: REDIS_URL (el mismo Redis que Channels/cache)
+celery -A config worker -l info
+# en Windows dev: agregar  --pool=solo
+```
+Las tasks son fire-and-forget (sin backend de resultado). Se encolan por ruta
+punteada (`config.tasks.run_task`), así que no hace falta registrar una task por hook.
