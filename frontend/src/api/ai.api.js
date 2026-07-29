@@ -23,3 +23,11 @@ export async function translate(text, targetLang) {
   const res = await http.post("/api/ai/translate/", { text, target_lang: targetLang });
   return res.data;
 }
+
+// Fase 0 — guardrails por tenant (opt-in + rate limits + presupuesto). Solo ADMIN.
+export async function getAiSettings() {
+  return (await http.get("/api/admin/ai/settings/")).data;
+}
+export async function updateAiSettings(data) {
+  return (await http.patch("/api/admin/ai/settings/", data)).data;
+}
