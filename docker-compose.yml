@@ -30,6 +30,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       SLA_SCHEDULER_MODE: "off"
       COLLECT_STATIC: "true"
+      # Los hooks de IA fire-and-forget se encolan en Celery (servicio `worker`),
+      # no en el thread in-process. Ver `worker` más abajo.
+      AI_TASK_QUEUE: celery
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
@@ -68,6 +71,31 @@ services:
     depends_on:
       web:
         condition: service_healthy
+
+  worker:
+    # Worker de Celery: consume la cola `allsafe` y ejecuta los hooks de IA async
+    # (auto-triage, sentimiento, sugerencia de KB, ingesta omnicanal). Sin esto,
+    # con AI_TASK_QUEUE=celery los mensajes se encolan pero nadie los procesa.
+    build: ./backend
+    command: celery -A config worker -l info -Q allsafe --concurrency=2
+    env_file: .env
+    environment:
+      DB_HOST: mysql
+      REDIS_URL: redis://redis:6379/0
+      AI_TASK_QUEUE: celery
+      RUN_MIGRATIONS: "false"   # las migraciones las corre `web` en su arranque
+      COLLECT_STATIC: "false"
+    depends_on:
+      web:
+        condition: service_healthy   # espera migraciones aplicadas
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   nginx:
     build: ./frontend
