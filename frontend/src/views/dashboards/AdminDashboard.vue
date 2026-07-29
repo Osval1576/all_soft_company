@@ -16,6 +16,7 @@
         <router-link to="/admin/sitio/ubicaciones" class="cms-link">Ubicaciones</router-link>
         <router-link to="/admin/sla" class="cms-link">SLA</router-link>
         <router-link to="/admin/kb" class="cms-link">Base de conocimiento</router-link>
+        <router-link to="/admin/ia" class="cms-link">Configuración de IA</router-link>
         <router-link to="/admin/metricas" class="cms-link">Métricas</router-link>
         <router-link to="/admin/miembros" class="cms-link">Miembros</router-link>
         <router-link to="/admin/suscripcion" class="cms-link">Suscripción</router-link>
