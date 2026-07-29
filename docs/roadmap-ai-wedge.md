@@ -107,9 +107,10 @@ Sin esto, ninguna feature es sostenible.
 
 ---
 
-## Estado (2026-07-28)
+## Estado (2026-07-29)
 ✅ Fase 0 (gateway) · ✅ Fase 1 (1A borrador + 1B triage) · ✅ Fase 2 (2A resumen + 2B sentimiento) · ✅ Fase 3 (3A KB + 3B deflección RAG) · ✅ Fase 4 (insights) · ✅ **Gateway multi-proveedor** (Claude/Gemini/OpenAI, elegible por despliegue).
-✅ **Fase 5**: 5.1 omnicanal WhatsApp (#9) · 5.2 KB auto-alimentada (#10) · 5.3 multilingüe (#11) · 5.4 posicionamiento "IA sin lock-in".
+✅ **Fase 5**: 5.1 omnicanal (WhatsApp #9 · email-to-ticket #13 · widget web #14 · Messenger/Instagram #15) · 5.2 KB auto-alimentada (#10) · 5.3 multilingüe (#11) · 5.4 posicionamiento "IA sin lock-in".
+✅ **Infra async**: hooks de IA fuera del request (#16) → **cola real Celery** con fallback a thread (#17).
 
 ---
 

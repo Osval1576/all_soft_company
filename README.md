@@ -10,7 +10,7 @@
 
 Sistema de gestión de tickets, SLA y soporte técnico en tiempo real, con arquitectura **multi-tenant** (multi-organización). Nace pensado para una empresa de sistemas de seguridad (cámaras, alarmas), con una arquitectura preparada para operar como SaaS para cualquier negocio que dé soporte técnico a clientes.
 
-**Estado del proyecto:** en desarrollo activo. Los módulos núcleo (autenticación, tickets, chat en tiempo real, SLA, facturación, multi-tenancy) están implementados; el proyecto sigue en refinamiento.
+**Estado del proyecto:** en desarrollo activo. Los módulos núcleo (autenticación, tickets, chat en tiempo real, SLA, facturación, multi-tenancy) están implementados, junto con un **wedge de IA completo** (auto-borrador, auto-triage, resumen, sentimiento→prioridad, base de conocimiento con deflección RAG, insights), **IA sin lock-in** (elegís Claude / Gemini / ChatGPT y traés tu key) y **omnicanal** (WhatsApp, email, widget web, Messenger/Instagram). El procesamiento de IA corre **async** (cola Celery en prod, thread in-process en dev).
 
 ## Descripción
 
@@ -48,6 +48,8 @@ AllSafe conecta a **clientes**, **agentes/técnicos** y **administradores** en u
 - Redis (canales en tiempo real y caché)
 - JWT (djangorestframework-simplejwt) para autenticación
 - Stripe para facturación y suscripciones
+- Gateway de IA multi-proveedor (Anthropic Claude / Google Gemini / OpenAI), elegible por despliegue
+- Celery + Redis para el procesamiento async de los hooks de IA (con fallback a thread in-process)
 - Docker / Docker Compose para despliegue
 
 **Frontend**
@@ -65,6 +67,11 @@ AllSafe conecta a **clientes**, **agentes/técnicos** y **administradores** en u
 ## Arquitectura destacada
 
 - **Multi-tenancy**: cada organización opera de forma aislada (scoping por tenant), con su propio slug de acceso, login e invitaciones de equipo.
+- **Wedge de IA (AI-native)**: auto-borrador de respuesta, auto-triage de prioridad, resumen del hilo, escalada por sentimiento, **base de conocimiento con deflección RAG**, KB que se auto-alimenta al resolver tickets, e insights de negocio — todo sobre el propio modelo de datos, gateado por plan y con humano en el loop.
+- **IA sin lock-in (BYO-AI)**: el despliegue elige el proveedor (Claude / Gemini / ChatGPT) y usa su propia API key; un único gateway aislado enruta según config.
+- **Omnicanal**: WhatsApp (Cloud API), email-to-ticket, widget web embebible e Instagram/Messenger entran por una misma abstracción de canal (ticket + hilo por contacto + deflección + aislamiento por tenant).
+- **Procesamiento async**: los hooks de IA fire-and-forget corren fuera del request/webhook — cola **Celery** en producción (worker aparte), thread daemon in-process en dev, inline en tests.
+- **Multilingüe**: traducción con IA para atender clientes en otros idiomas sin equipo bilingüe.
 - **Motor de SLA**: cálculo de tiempos de atención con calendario de negocio configurable y verificación automática mediante un proceso `scheduler` independiente.
 - **Tiempo real**: chat técnico–cliente y notificaciones push mediante WebSockets, con tracking de presencia (en línea / desconectado).
 - **Facturación**: integración con Stripe, incluye verificación automática de periodos de prueba.
@@ -86,6 +93,10 @@ all_soft_company/
 │   ├── csat/                    # Encuestas de satisfacción
 │   ├── notifications/           # Notificaciones en tiempo real + presencia
 │   ├── metrics/                  # Analíticas y dashboards
+│   ├── ai/                      # Gateway multi-proveedor + features de IA (ver ai/README.md)
+│   ├── kb/                      # Base de conocimiento + deflección RAG + KB auto-alimentada
+│   ├── inbound/                 # Omnicanal: WhatsApp, email, widget, Messenger/IG
+│   ├── config/                  # Settings, Celery y background tasks
 │   └── landing_cms/             # Contenido del landing page público
 ├── frontend/                    # Vue 3 + Vite
 │   ├── src/views/dashboards/     # Dashboards por rol
@@ -109,8 +120,37 @@ docker compose up --build
 - Healthcheck: `http://localhost:8000/api/health/`
 - Frontend (vía Nginx): `http://localhost`
 
+## IA y omnicanal — configuración
+
+La IA es **opt-in** por despliegue y **gateada por plan** (Pro/Business). Se elige el proveedor y se trae la key (ver `.env.example` y `backend/ai/README.md`):
+
+```bash
+AI_FEATURES_ENABLED=true
+AI_PROVIDER=gemini            # anthropic | gemini | openai
+GEMINI_API_KEY=...            # la key del proveedor elegido
+AI_TASK_QUEUE=celery          # cola real en prod (vacío = thread in-process)
+```
+
+Worker de IA async en producción:
+
+```bash
+celery -A config worker -l info      # Windows dev: --pool=solo
+```
+
+Los canales de entrada (WhatsApp / email / widget / Messenger-IG) se configuran por env y se registran por tenant en `/api/admin/inbound/accounts/` (ver `backend/inbound/README.md`). Sin credenciales de IA, todo **degrada con gracia** (el helpdesk sigue funcionando sin IA).
+
 ## Roadmap
 
+**Hecho**
+- [x] Wedge de IA: auto-borrador, auto-triage, resumen, sentimiento→prioridad, insights
+- [x] Base de conocimiento + deflección RAG + KB auto-alimentada
+- [x] Gateway de IA multi-proveedor (Claude / Gemini / OpenAI) — "IA sin lock-in"
+- [x] Omnicanal: WhatsApp, email-to-ticket, widget web, Messenger/Instagram
+- [x] Multilingüe (traducción con IA)
+- [x] Procesamiento async con cola (Celery + Redis, fallback a thread)
+
+**Pendiente**
+- [ ] Traducción automática en el pipeline de mensajes (hoy asistida por el agente)
 - [ ] Refinamiento de flujos de agente/administrador
 - [ ] Cobertura de pruebas end-to-end en frontend
 - [ ] Documentación de API
