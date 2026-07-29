@@ -145,3 +145,80 @@ class ChannelAccountAdminTests(TestCase):
     def test_agent_forbidden(self):
         self.c.force_authenticate(self.agent)
         self.assertEqual(self.c.get(self.BASE).status_code, 403)
+
+
+class EmailParseTests(TestCase):
+    def test_normalizes_fields(self):
+        from inbound.email import parse_inbound
+        m = parse_inbound({
+            "from": "Ana Pérez <ANA@cliente.com>",
+            "to": "Soporte <SOPORTE@org.com>",
+            "subject": "  No puedo entrar  ",
+            "body-plain": "Hola, no puedo iniciar sesión.",
+        })
+        self.assertEqual(m["contact_external_id"], "ana@cliente.com")
+        self.assertEqual(m["account_external_id"], "soporte@org.com")
+        self.assertEqual(m["contact_name"], "Ana Pérez")
+        self.assertEqual(m["subject"], "No puedo entrar")
+        self.assertEqual(m["text"], "Hola, no puedo iniciar sesión.")
+
+
+class EmailInboundTests(TestCase):
+    """Email-to-ticket: ingesta con subject + webhook."""
+
+    def setUp(self):
+        self.org = create_org("INBEM")  # Business
+        ChannelAccount.objects.create(organization=self.org, channel=Channel.EMAIL,
+                                      external_id="soporte@inbem.com")
+        self.c = APIClient()
+
+    @patch("ai.gateway.generate", return_value="NO_SE")
+    def test_subject_used_as_ticket_title(self, _g):
+        r = services.handle_inbound_message(
+            channel=Channel.EMAIL, account_external_id="soporte@inbem.com",
+            contact_external_id="cliente@x.com", subject="Problema con la factura",
+            text="No me llega la factura de este mes.")
+        self.assertEqual(r["ticket"].titulo, "Problema con la factura")
+
+    @patch("inbound.views.email_channel.send_reply")
+    @patch("ai.gateway.generate", return_value="NO_SE")
+    def test_webhook_creates_ticket(self, _g, _send):
+        payload = {"from": "Juan <juan@x.com>", "to": "soporte@inbem.com",
+                   "subject": "Ayuda", "text": "Necesito ayuda con mi cuenta."}
+        r = self.c.post("/api/inbound/email/", data=payload, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        t = Ticket.objects.get(organization=self.org)
+        self.assertEqual(t.titulo, "Ayuda")
+        self.assertEqual(t.creado_por.username, f"email:{self.org.id}:juan@x.com")
+
+    @patch("inbound.views.email_channel.send_reply")
+    def test_webhook_deflection_sends_reply(self, mock_send):
+        Article.objects.create(organization=self.org, title="Restablecer contraseña",
+                               body="Andá a Ajustes y restablecé.", is_published=True)
+        with patch("ai.gateway.generate", return_value="Andá a Ajustes y restablecé."):
+            payload = {"from": "a@x.com", "to": "soporte@inbem.com",
+                       "subject": "contraseña", "text": "cómo restablezco mi contraseña?"}
+            r = self.c.post("/api/inbound/email/", data=payload, format="json")
+        self.assertEqual(r.status_code, 200)
+        mock_send.assert_called_once()
+
+    @patch("ai.gateway.generate", return_value="NO_SE")
+    def test_webhook_missing_addresses_400(self, _g):
+        r = self.c.post("/api/inbound/email/", data={"subject": "x", "text": "y"}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    @patch("ai.gateway.generate", return_value="NO_SE")
+    def test_webhook_rejects_wrong_token(self, _g):
+        with patch.dict(os.environ, {"INBOUND_EMAIL_SECRET": "s3cr3t"}):
+            payload = {"from": "a@x.com", "to": "soporte@inbem.com", "text": "hola"}
+            r = self.c.post("/api/inbound/email/?token=WRONG", data=payload, format="json")
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(Ticket.objects.count(), 0)
+
+    @patch("inbound.views.email_channel.send_reply")
+    @patch("ai.gateway.generate", return_value="NO_SE")
+    def test_webhook_unknown_account_no_ticket(self, _g, _send):
+        payload = {"from": "a@x.com", "to": "otra@desconocida.com", "text": "hola"}
+        r = self.c.post("/api/inbound/email/", data=payload, format="json")
+        self.assertEqual(r.status_code, 200)  # 200 para que el proveedor no reintente
+        self.assertEqual(Ticket.objects.count(), 0)
