@@ -39,7 +39,7 @@ def _contact_user(org, channel, contact_external_id, name):
         is_active=True, first_name=(name or "")[:150])
 
 
-def _thread_ticket(org, channel, contact_external_id, contact, text):
+def _thread_ticket(org, channel, contact_external_id, contact, text, title_hint=None):
     """Ticket abierto del contacto (reusa el del hilo si sigue abierto; si no,
     crea uno nuevo y reengancha el hilo). Devuelve (ticket, created)."""
     thread = (ChannelThread.objects
@@ -48,7 +48,7 @@ def _thread_ticket(org, channel, contact_external_id, contact, text):
     if thread and thread.ticket.estado in _OPEN_STATES:
         return thread.ticket, False
 
-    titulo = (text or "").strip()[:120] or f"Consulta por {channel}"
+    titulo = ((title_hint or text) or "").strip()[:120] or f"Consulta por {channel}"
     ticket = create_ticket(org, creado_por=contact, titulo=titulo, descripcion=(text or ""))
     if thread:
         thread.ticket = ticket
@@ -62,12 +62,13 @@ def _thread_ticket(org, channel, contact_external_id, contact, text):
 
 @transaction.atomic
 def handle_inbound_message(*, channel, account_external_id, contact_external_id,
-                           text, contact_name=""):
+                           text, contact_name="", subject=None):
     """Procesa un mensaje entrante. Devuelve {"ticket", "reply", "created"} o None
     si la cuenta no corresponde a ninguna org (mensaje ignorado).
 
-    `reply` es la respuesta automática de deflección (el caller la envía por el
-    canal) o None si no se resolvió con la KB (queda para un agente humano).
+    `subject` (opcional, p. ej. el asunto del email) se usa como título del ticket
+    nuevo. `reply` es la respuesta automática de deflección (el caller la envía por
+    el canal) o None si no se resolvió con la KB (queda para un agente humano).
     """
     text = (text or "").strip()
     if not text:
@@ -80,7 +81,7 @@ def handle_inbound_message(*, channel, account_external_id, contact_external_id,
         return None
 
     contact = _contact_user(org, channel, contact_external_id, contact_name)
-    ticket, created = _thread_ticket(org, channel, contact_external_id, contact, text)
+    ticket, created = _thread_ticket(org, channel, contact_external_id, contact, text, subject)
     TicketMessage.objects.create(ticket=ticket, sender=contact, content=text)
 
     # 2B: escalada por sentimiento (resiliente, nunca rompe la ingesta).

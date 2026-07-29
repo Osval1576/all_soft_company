@@ -32,6 +32,22 @@ convierte en tickets, con hilo por contacto y **deflección RAG** (reusa la KB /
 4. Registrá la cuenta del tenant: `POST /api/admin/inbound/accounts/`
    `{ "channel": "whatsapp", "external_id": "<phone_number_id>" }` (como ADMIN).
 
+## Configurar Email-to-ticket
+1. En tu proveedor de inbound-parse (SendGrid Inbound Parse, Mailgun Routes,
+   Postmark, etc.): apuntá el parseo del buzón de soporte a
+   `https://TU_DOMINIO/api/inbound/email/`.
+2. (Opcional, recomendado) Seteá `INBOUND_EMAIL_SECRET` y pasá `?token=<secret>`
+   (o header `X-Inbound-Token`) en la URL del webhook, para que solo tu proveedor
+   pueda postear.
+3. Registrá la cuenta del tenant: `POST /api/admin/inbound/accounts/`
+   `{ "channel": "email", "external_id": "soporte@tucliente.com" }` (la dirección
+   a la que escriben los clientes; se resuelve por el `to` del mail).
+4. La respuesta automática de deflección sale por el email backend de Django
+   (configurá `EMAIL_HOST`/SMTP; sin eso va a consola).
+
+El adapter (`email.py`) normaliza los campos comunes de los proveedores (`from`,
+`to`, `subject`, `text`/`body-plain`/`TextBody`); ajustá si el tuyo difiere.
+
 ## Notas / siguientes pasos
 - El procesamiento es inline en el webhook (la llamada de IA suma latencia). Para
   volumen alto conviene una cola/worker (deja el 200 inmediato y procesa aparte).
