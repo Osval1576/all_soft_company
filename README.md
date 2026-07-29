@@ -62,7 +62,7 @@ AllSafe conecta a **clientes**, **agentes/técnicos** y **administradores** en u
 
 **Infraestructura**
 - Nginx como proxy reverso con TLS
-- Servicios independientes para web, scheduler de SLA, scheduler de periodos de prueba, base de datos y caché
+- Servicios independientes para web, worker de Celery (hooks de IA async), scheduler de SLA, scheduler de periodos de prueba, base de datos y caché
 
 ## Arquitectura destacada
 
@@ -120,6 +120,8 @@ docker compose up --build
 - Healthcheck: `http://localhost:8000/api/health/`
 - Frontend (vía Nginx): `http://localhost`
 
+`docker compose up` levanta todos los servicios: `web` (API/ASGI), `worker` (Celery — procesa los hooks de IA async), `scheduler` y `trial-scheduler` (loops de SLA y periodos de prueba), `mysql`, `redis` y `nginx`. El `web` aplica las migraciones al arrancar; el resto espera a que esté sano.
+
 ## IA y omnicanal — configuración
 
 La IA es **opt-in** por despliegue y **gateada por plan** (Pro/Business). Se elige el proveedor y se trae la key (ver `.env.example` y `backend/ai/README.md`):
@@ -131,10 +133,10 @@ GEMINI_API_KEY=...            # la key del proveedor elegido
 AI_TASK_QUEUE=celery          # cola real en prod (vacío = thread in-process)
 ```
 
-Worker de IA async en producción:
+Con Docker Compose el **worker de Celery** ya corre como servicio (`worker`), así que no hay que arrancarlo a mano. Para dev **sin** Docker (o para depurar), se corre aparte:
 
 ```bash
-celery -A config worker -l info      # Windows dev: --pool=solo
+celery -A config worker -l info -Q allsafe      # Windows dev: agregar --pool=solo
 ```
 
 Los canales de entrada (WhatsApp / email / widget / Messenger-IG) se configuran por env y se registran por tenant en `/api/admin/inbound/accounts/` (ver `backend/inbound/README.md`). Sin credenciales de IA, todo **degrada con gracia** (el helpdesk sigue funcionando sin IA).

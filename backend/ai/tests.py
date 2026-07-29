@@ -53,6 +53,13 @@ class RunAsyncQueueTests(SimpleTestCase):
         run_task("ai.tests._append_result", ["hola"], {})
         self.assertEqual(_RESULTS, ["hola"])
 
+    def test_run_task_registered_in_celery_app(self):
+        # `config` no es una app de INSTALLED_APPS: si celery.py deja de importar
+        # config.tasks, el worker rechazaría los mensajes ("unregistered task").
+        from config.celery import app
+        self.assertIn("config.run_task", app.tasks)
+        self.assertEqual(app.conf.task_default_queue, "allsafe")
+
 
 class GatewayDispatchTests(SimpleTestCase):
     """Gateway multi-proveedor: elección de proveedor/modelo por env, sin DB."""
