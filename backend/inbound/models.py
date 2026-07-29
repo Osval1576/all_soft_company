@@ -4,6 +4,7 @@ from django.db import models
 class Channel(models.TextChoices):
     WHATSAPP = "whatsapp", "WhatsApp"
     EMAIL = "email", "Email"
+    MESSENGER = "messenger", "Messenger"
     INSTAGRAM = "instagram", "Instagram"
     WIDGET = "widget", "Widget web"
 

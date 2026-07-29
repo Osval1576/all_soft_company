@@ -286,3 +286,63 @@ class WidgetTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("javascript", r["Content-Type"])
         self.assertIn("asw-bubble", r.content.decode())
+
+
+class MessengerParseTests(TestCase):
+    def test_parse_messenger_page(self):
+        from inbound.messenger import parse_webhook
+        payload = {"object": "page", "entry": [{"messaging": [
+            {"sender": {"id": "PSID1"}, "recipient": {"id": "PAGE1"},
+             "message": {"text": "hola"}}]}]}
+        [m] = parse_webhook(payload)
+        self.assertEqual(m["channel"], Channel.MESSENGER)
+        self.assertEqual(m["account_external_id"], "PAGE1")
+        self.assertEqual(m["contact_external_id"], "PSID1")
+        self.assertEqual(m["text"], "hola")
+
+    def test_parse_instagram(self):
+        from inbound.messenger import parse_webhook
+        payload = {"object": "instagram", "entry": [{"messaging": [
+            {"sender": {"id": "IG1"}, "recipient": {"id": "IGACC"},
+             "message": {"text": "hi"}}]}]}
+        [m] = parse_webhook(payload)
+        self.assertEqual(m["channel"], Channel.INSTAGRAM)
+
+    def test_parse_ignores_echo_and_nontext(self):
+        from inbound.messenger import parse_webhook
+        payload = {"object": "page", "entry": [{"messaging": [
+            {"sender": {"id": "S"}, "recipient": {"id": "R"},
+             "message": {"text": "eco", "is_echo": True}},
+            {"sender": {"id": "S"}, "recipient": {"id": "R"},
+             "message": {"attachments": [{"type": "image"}]}}]}]}
+        self.assertEqual(parse_webhook(payload), [])
+
+    def test_parse_unknown_object_empty(self):
+        from inbound.messenger import parse_webhook
+        self.assertEqual(parse_webhook({"object": "whatsapp_business_account"}), [])
+
+
+class MessengerWebhookTests(TestCase):
+    def setUp(self):
+        self.org = create_org("INBMS")
+        ChannelAccount.objects.create(organization=self.org, channel=Channel.MESSENGER,
+                                      external_id="PAGEID")
+        self.c = APIClient()
+
+    def test_get_verification_ok(self):
+        with patch.dict(os.environ, {"MESSENGER_VERIFY_TOKEN": "tok"}):
+            r = self.c.get("/api/inbound/messenger/", {"hub.mode": "subscribe",
+                           "hub.verify_token": "tok", "hub.challenge": "CH"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.content.decode(), "CH")
+
+    @patch("inbound.views.messenger.send_message")
+    @patch("ai.gateway.generate", return_value="NO_SE")
+    def test_post_creates_ticket(self, _g, _send):
+        payload = {"object": "page", "entry": [{"messaging": [
+            {"sender": {"id": "PSID9"}, "recipient": {"id": "PAGEID"},
+             "message": {"text": "necesito ayuda"}}]}]}
+        r = self.c.post("/api/inbound/messenger/", data=payload, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        t = Ticket.objects.get(organization=self.org)
+        self.assertEqual(t.creado_por.username, f"messenger:{self.org.id}:PSID9")
