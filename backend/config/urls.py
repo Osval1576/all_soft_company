@@ -47,6 +47,7 @@ urlpatterns = [
     path("api/admin/sla/", include("sla.admin_urls")),
     path("api/admin/kb/", include("kb.admin_urls")),
     path("api/admin/inbound/", include("inbound.admin_urls")),
+    path("api/admin/ai/", include("ai.admin_urls")),
     path("api/", include("tickets_t.urls")),
     path("api/", include("notifications.urls")),
     path("api/csat/", include("csat.urls")),

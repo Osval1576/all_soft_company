@@ -139,6 +139,8 @@ celery -A config worker -l info      # Windows dev: --pool=solo
 
 Los canales de entrada (WhatsApp / email / widget / Messenger-IG) se configuran por env y se registran por tenant en `/api/admin/inbound/accounts/` (ver `backend/inbound/README.md`). Sin credenciales de IA, todo **degrada con gracia** (el helpdesk sigue funcionando sin IA).
 
+Cada organización controla su uso de IA en `/api/admin/ai/settings/` (`OrgAiSettings`): **opt-in** (`enabled`) y **rate limits** — acciones de IA autenticadas por usuario/minuto y llamadas de deflección desde canales públicos por org/hora. El tope público protege el endpoint anónimo del widget/WhatsApp (que corre una llamada de IA por consulta) de picos de costo/abuso: superado el límite, la consulta escala a un humano sin gastar IA.
+
 ## Roadmap
 
 **Hecho**
@@ -148,8 +150,10 @@ Los canales de entrada (WhatsApp / email / widget / Messenger-IG) se configuran 
 - [x] Omnicanal: WhatsApp, email-to-ticket, widget web, Messenger/Instagram
 - [x] Multilingüe (traducción con IA)
 - [x] Procesamiento async con cola (Celery + Redis, fallback a thread)
+- [x] Guardrails de IA por tenant: opt-in (`OrgAiSettings`) + rate limiting (costo/abuso)
 
 **Pendiente**
+- [ ] Presupuesto mensual de IA por org con metering de costo (AiUsage)
 - [ ] Traducción automática en el pipeline de mensajes (hoy asistida por el agente)
 - [ ] Refinamiento de flujos de agente/administrador
 - [ ] Cobertura de pruebas end-to-end en frontend

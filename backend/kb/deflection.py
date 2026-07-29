@@ -18,11 +18,19 @@ def run_deflection(org, query):
     """Intenta resolver `query` con la KB publicada de `org`. Devuelve el payload
     {available, resolved, answer, sources}. Gateado por plan; resiliente."""
     from ai.services import ai_enabled, answer_from_kb
+    from ai.ratelimit import allow_public
     if not ai_enabled(org):
         return payload(available=False)
 
     articles = search_articles(org, query)
     if not articles:
+        return payload(available=True)
+
+    # Guardrail de costo/abuso: el endpoint público corre una llamada de IA por
+    # consulta. Si la org superó su tope horario, no gastamos IA y degradamos a
+    # "no resuelto" (escala a un humano).
+    if not allow_public(org):
+        logger.info("deflección pública rate-limited para org %s", getattr(org, "id", None))
         return payload(available=True)
 
     try:

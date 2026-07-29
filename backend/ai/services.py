@@ -7,7 +7,11 @@ from django.conf import settings
 
 
 def ai_enabled(org):
-    """True si la org puede usar features de IA (flag global + plan pago)."""
+    """True si la org puede usar features de IA.
+
+    Combina: flag global (AI_FEATURES_ENABLED) + plan pago (Pro/Business) +
+    opt-in de la org (OrgAiSettings.enabled). Cualquiera en falso apaga la IA sin
+    romper el resto del producto (degradación elegante)."""
     if not getattr(settings, "AI_FEATURES_ENABLED", False):
         return False
     if org is None:
@@ -15,7 +19,10 @@ def ai_enabled(org):
     sub = getattr(org, "subscription", None)
     if sub is None:
         return False
-    return sub.effective_plan.key in ("pro", "business")
+    if sub.effective_plan.key not in ("pro", "business"):
+        return False
+    from .models import OrgAiSettings
+    return OrgAiSettings.get_for(org).enabled
 
 
 def build_draft_prompt(ticket):

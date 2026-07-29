@@ -484,3 +484,154 @@ class AiTranslateTests(TestCase):
         self.c.force_authenticate(self.agent)
         r = self.c.post(self.URL, {"text": "hola", "target_lang": "en"}, format="json")
         self.assertEqual(r.status_code, 503)
+
+
+# --- Fase 0 guardrails: OrgAiSettings + rate limiting -------------------------
+
+from django.core.cache import cache
+
+from ai.models import OrgAiSettings
+from ai import ratelimit, services
+
+
+class OrgAiSettingsModelTests(TestCase):
+    def test_get_for_returns_defaults_when_no_row(self):
+        org = create_org("SETDEF")
+        s = OrgAiSettings.get_for(org)
+        self.assertIsNone(s.pk)  # default sin persistir
+        self.assertTrue(s.enabled)
+        self.assertEqual(s.rate_limit_per_min, 30)
+        self.assertEqual(s.public_rate_limit_per_hour, 60)
+
+    def test_get_for_returns_existing_row(self):
+        org = create_org("SETROW")
+        OrgAiSettings.objects.create(organization=org, rate_limit_per_min=5)
+        s = OrgAiSettings.get_for(org)
+        self.assertIsNotNone(s.pk)
+        self.assertEqual(s.rate_limit_per_min, 5)
+
+    def test_get_for_none_org_is_default(self):
+        s = OrgAiSettings.get_for(None)
+        self.assertIsNone(s.pk)
+        self.assertTrue(s.enabled)
+
+
+class AiEnabledOptInTests(TestCase):
+    def setUp(self):
+        self.org = create_org("OPTIN")  # Business por defecto
+
+    def test_enabled_by_default(self):
+        self.assertTrue(services.ai_enabled(self.org))
+
+    def test_opt_out_disables_ai(self):
+        OrgAiSettings.objects.create(organization=self.org, enabled=False)
+        self.assertFalse(services.ai_enabled(self.org))
+
+
+class RateLimitUnitTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.org = create_org("RLUNIT")
+
+    def test_allow_user_blocks_after_limit(self):
+        OrgAiSettings.objects.create(organization=self.org, rate_limit_per_min=2)
+        self.assertTrue(ratelimit.allow_user(self.org, 1))
+        self.assertTrue(ratelimit.allow_user(self.org, 1))
+        self.assertFalse(ratelimit.allow_user(self.org, 1))
+        # otro usuario tiene su propio contador
+        self.assertTrue(ratelimit.allow_user(self.org, 2))
+
+    def test_allow_public_blocks_after_limit(self):
+        OrgAiSettings.objects.create(organization=self.org, public_rate_limit_per_hour=1)
+        self.assertTrue(ratelimit.allow_public(self.org))
+        self.assertFalse(ratelimit.allow_public(self.org))
+
+    def test_zero_limit_is_unlimited(self):
+        OrgAiSettings.objects.create(
+            organization=self.org, rate_limit_per_min=0, public_rate_limit_per_hour=0)
+        for _ in range(50):
+            self.assertTrue(ratelimit.allow_user(self.org, 9))
+            self.assertTrue(ratelimit.allow_public(self.org))
+
+
+class AiViewRateLimitTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.c = APIClient()
+        self.org = create_org("RLVIEW")
+        self.agent = User.objects.create_user("rl_agent", role="AGENT",
+                                               organization=self.org, is_active=True)
+        self.customer = User.objects.create_user("rl_cust", role="CUSTOMER",
+                                                  organization=self.org, is_active=True)
+        self.ticket = Ticket.objects.create(
+            reference="RL-1", titulo="t", descripcion="d",
+            creado_por=self.customer, asignado_a=self.agent,
+            organization=self.org, estado="IN_PROGRESS")
+        OrgAiSettings.objects.create(organization=self.org, rate_limit_per_min=1)
+
+    @patch("ai.gateway.generate", return_value=DRAFT)
+    def test_draft_view_429_over_limit(self, mock_gen):
+        self.c.force_authenticate(self.agent)
+        url = _url(self.ticket.id)
+        r1 = self.c.post(url)
+        self.assertEqual(r1.status_code, 200, r1.content)
+        r2 = self.c.post(url)
+        self.assertEqual(r2.status_code, 429)
+        self.assertEqual(mock_gen.call_count, 1)  # no gastó IA en la 2da
+
+
+class PublicDeflectionRateLimitTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.org = create_org("RLPUB")
+        from kb.models import Article
+        Article.objects.create(
+            organization=self.org, title="Reiniciar el panel",
+            body="Para reiniciar el panel de reportes seguí estos pasos.",
+            is_published=True)
+        OrgAiSettings.objects.create(organization=self.org, public_rate_limit_per_hour=1)
+
+    @patch("ai.services.answer_from_kb", return_value="Reiniciá así.")
+    def test_deflection_stops_calling_ai_over_limit(self, mock_ans):
+        from kb.deflection import run_deflection
+        q = "como reiniciar el panel de reportes"
+        first = run_deflection(self.org, q)
+        self.assertTrue(first["resolved"])
+        second = run_deflection(self.org, q)
+        self.assertFalse(second["resolved"])
+        self.assertTrue(second["available"])
+        self.assertEqual(mock_ans.call_count, 1)  # 2da consulta no llegó a la IA
+
+
+class OrgAiSettingsAdminApiTests(TestCase):
+    URL = "/api/admin/ai/settings/"
+
+    def setUp(self):
+        self.c = APIClient()
+        self.org = create_org("SETADMIN")
+        self.admin = User.objects.create_user("set_admin", role="ADMIN",
+                                               organization=self.org, is_active=True)
+        self.agent = User.objects.create_user("set_agent", role="AGENT",
+                                               organization=self.org, is_active=True)
+
+    def test_get_returns_defaults(self):
+        self.c.force_authenticate(self.admin)
+        r = self.c.get(self.URL)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.data["enabled"])
+        self.assertEqual(r.data["public_rate_limit_per_hour"], 60)
+
+    def test_patch_updates_and_persists(self):
+        self.c.force_authenticate(self.admin)
+        r = self.c.patch(self.URL, {"enabled": False, "rate_limit_per_min": 10},
+                         format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        s = OrgAiSettings.objects.get(organization=self.org)
+        self.assertFalse(s.enabled)
+        self.assertEqual(s.rate_limit_per_min, 10)
+
+    def test_agent_forbidden(self):
+        self.c.force_authenticate(self.agent)
+        self.assertEqual(self.c.get(self.URL).status_code, 403)
+        self.assertEqual(self.c.patch(self.URL, {"enabled": False},
+                                      format="json").status_code, 403)
