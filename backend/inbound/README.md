@@ -48,6 +48,23 @@ convierte en tickets, con hilo por contacto y **deflección RAG** (reusa la KB /
 El adapter (`email.py`) normaliza los campos comunes de los proveedores (`from`,
 `to`, `subject`, `text`/`body-plain`/`TextBody`); ajustá si el tuyo difiere.
 
+## Widget web embebible
+Deflección pública en la web del cliente: un visitante anónimo pregunta, la IA
+responde con la KB publicada, y si no alcanza deja su email → se crea un ticket
+(canal `widget`).
+
+1. Registrá el widget del tenant: `POST /api/admin/inbound/accounts/`
+   `{ "channel": "widget", "external_id": "<CLAVE_PUBLICA>" }` (una clave no
+   adivinable, p. ej. un UUID; es pública, va en el HTML del cliente).
+2. El cliente agrega en su sitio:
+   ```html
+   <script src="https://TU_DOMINIO/widget.js"
+           data-key="CLAVE_PUBLICA" data-api="https://TU_DOMINIO"></script>
+   ```
+3. Endpoints (públicos, CORS abierto — solo exponen KB publicada + creación de
+   ticket): `POST /api/widget/<key>/ask/` (deflección) y
+   `POST /api/widget/<key>/contact/` (crea el ticket con el email del visitante).
+
 ## Notas / siguientes pasos
 - El procesamiento es inline en el webhook (la llamada de IA suma latencia). Para
   volumen alto conviene una cola/worker (deja el 200 inmediato y procesa aparte).

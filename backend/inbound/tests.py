@@ -222,3 +222,67 @@ class EmailInboundTests(TestCase):
         r = self.c.post("/api/inbound/email/", data=payload, format="json")
         self.assertEqual(r.status_code, 200)  # 200 para que el proveedor no reintente
         self.assertEqual(Ticket.objects.count(), 0)
+
+
+class WidgetTests(TestCase):
+    """Widget web embebible: deflección pública + creación de ticket."""
+
+    def setUp(self):
+        self.org = create_org("INBWID")  # Business
+        ChannelAccount.objects.create(organization=self.org, channel=Channel.WIDGET,
+                                      external_id="pubkey123")
+        self.c = APIClient()
+
+    def test_ask_resolved_returns_answer_and_titles_only(self):
+        Article.objects.create(organization=self.org, title="Restablecer contraseña",
+                               body="Andá a Ajustes y restablecé.", is_published=True)
+        with patch("ai.gateway.generate", return_value="Andá a Ajustes y restablecé."):
+            r = self.c.post("/api/widget/pubkey123/ask/",
+                            {"query": "cómo restablezco mi contraseña?"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.data["resolved"])
+        self.assertIn("restablecé", r.data["answer"])
+        # el widget público solo expone títulos de fuente (no id/slug)
+        self.assertEqual(list(r.data["sources"][0].keys()), ["title"])
+        self.assertEqual(r["Access-Control-Allow-Origin"], "*")
+
+    @patch("ai.gateway.generate", return_value="NO_SE")
+    def test_ask_unresolved(self, _g):
+        Article.objects.create(organization=self.org, title="Otro tema",
+                               body="contenido", is_published=True)
+        r = self.c.post("/api/widget/pubkey123/ask/", {"query": "algo"}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.data["resolved"])
+
+    def test_ask_unknown_key_404(self):
+        r = self.c.post("/api/widget/NOPE/ask/", {"query": "hola"}, format="json")
+        self.assertEqual(r.status_code, 404)
+
+    def test_ask_missing_query_400(self):
+        r = self.c.post("/api/widget/pubkey123/ask/", {}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    @patch("ai.gateway.generate", return_value="NO_SE")
+    def test_contact_creates_ticket(self, _g):
+        r = self.c.post("/api/widget/pubkey123/contact/",
+                        {"query": "no puedo pagar", "email": "Visitante@x.com", "name": "Vis"},
+                        format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertTrue(r.data["reference"])
+        t = Ticket.objects.get(organization=self.org)
+        self.assertEqual(t.creado_por.username, f"widget:{self.org.id}:visitante@x.com")
+
+    def test_contact_missing_email_400(self):
+        r = self.c.post("/api/widget/pubkey123/contact/", {"query": "hola"}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_contact_unknown_key_404(self):
+        r = self.c.post("/api/widget/NOPE/contact/",
+                        {"query": "hola", "email": "a@x.com"}, format="json")
+        self.assertEqual(r.status_code, 404)
+
+    def test_widget_js_served(self):
+        r = self.c.get("/widget.js")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("javascript", r["Content-Type"])
+        self.assertIn("asw-bubble", r.content.decode())
