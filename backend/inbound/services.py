@@ -108,7 +108,7 @@ def _try_deflect(org, text):
         if not allow_public(org):
             logger.info("deflección de canal rate-limited para org %s", getattr(org, "id", None))
             return None
-        return answer_from_kb(text, articles)
+        return answer_from_kb(text, articles, org=org)
     except Exception:
         logger.warning("deflección de canal falló para org %s",
                        getattr(org, "id", None), exc_info=True)

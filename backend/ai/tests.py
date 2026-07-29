@@ -76,7 +76,7 @@ class GatewayDispatchTests(SimpleTestCase):
 
     def test_generate_dispatches_by_provider_and_tier(self):
         with patch.dict(os.environ, {"AI_PROVIDER": "gemini"}), \
-             patch("ai.gateway._gemini", return_value="ok") as mg, \
+             patch("ai.gateway._gemini", return_value=("ok", None)) as mg, \
              patch("ai.gateway._anthropic") as ma, \
              patch("ai.gateway._openai") as mo:
             out = gateway.generate(system="s", user_prompt="u", tier="fast")
@@ -635,3 +635,112 @@ class OrgAiSettingsAdminApiTests(TestCase):
         self.assertEqual(self.c.get(self.URL).status_code, 403)
         self.assertEqual(self.c.patch(self.URL, {"enabled": False},
                                       format="json").status_code, 403)
+
+
+# --- Fase 0: metering de costo + presupuesto mensual -------------------------
+
+from decimal import Decimal
+
+from ai import metering, pricing
+from ai.models import AiUsage
+
+
+class PricingTests(SimpleTestCase):
+    def test_cost_for_known_model(self):
+        # opus-4-8: $5/1M in, $25/1M out. 1000 in + 500 out.
+        cost = pricing.cost_for("anthropic", "claude-opus-4-8", 1000, 500)
+        self.assertEqual(cost, Decimal("0.005") + Decimal("0.0125"))
+
+    def test_unknown_model_is_zero(self):
+        self.assertEqual(pricing.cost_for("anthropic", "modelo-raro", 1000, 1000),
+                         Decimal("0"))
+
+    def test_env_override(self):
+        with patch.dict(os.environ, {"AI_PRICE_OPENAI_GPT-X_IN": "2",
+                                     "AI_PRICE_OPENAI_GPT-X_OUT": "8"}):
+            self.assertEqual(pricing.cost_for("openai", "gpt-x", 1_000_000, 1_000_000),
+                             Decimal("10"))
+
+
+class MeteringTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.org = create_org("METER")
+
+    def test_record_creates_row_and_sums_month(self):
+        metering.record(self.org, provider="anthropic", model="claude-opus-4-8",
+                        tier="quality", source="draft",
+                        usage={"input": 1000, "output": 500})
+        self.assertEqual(AiUsage.objects.filter(organization=self.org).count(), 1)
+        self.assertEqual(metering.month_cost(self.org), Decimal("0.0175"))
+
+    def test_record_noop_without_usage_or_org(self):
+        metering.record(self.org, provider="anthropic", model="x", tier="fast",
+                        source="triage", usage=None)
+        metering.record(None, provider="anthropic", model="x", tier="fast",
+                        source="triage", usage={"input": 10, "output": 10})
+        self.assertEqual(AiUsage.objects.count(), 0)
+
+    def test_over_budget(self):
+        OrgAiSettings.objects.create(organization=self.org, monthly_budget_usd=Decimal("0.01"))
+        self.assertFalse(metering.over_budget(self.org))
+        metering.record(self.org, provider="anthropic", model="claude-opus-4-8",
+                        tier="quality", source="draft",
+                        usage={"input": 1000, "output": 500})  # $0.0175 > $0.01
+        self.assertTrue(metering.over_budget(self.org))
+
+    def test_zero_budget_never_over(self):
+        OrgAiSettings.objects.create(organization=self.org, monthly_budget_usd=0)
+        metering.record(self.org, provider="anthropic", model="claude-opus-4-8",
+                        tier="quality", source="draft",
+                        usage={"input": 10_000_000, "output": 10_000_000})
+        self.assertFalse(metering.over_budget(self.org))
+
+
+class GatewayMeteringTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.org = create_org("GWMETER")
+
+    def test_generate_records_usage_when_org_given(self):
+        with patch.dict(os.environ, {"AI_PROVIDER": "anthropic"}), \
+             patch("ai.gateway._anthropic",
+                   return_value=("hola", {"input": 200, "output": 100})):
+            out = gateway.generate(system="s", user_prompt="u", tier="quality",
+                                   org=self.org, source="draft")
+        self.assertEqual(out, "hola")
+        row = AiUsage.objects.get(organization=self.org)
+        self.assertEqual(row.input_tokens, 200)
+        self.assertEqual(row.output_tokens, 100)
+        self.assertEqual(row.source, "draft")
+
+    def test_generate_no_metering_without_org(self):
+        with patch.dict(os.environ, {"AI_PROVIDER": "anthropic"}), \
+             patch("ai.gateway._anthropic",
+                   return_value=("hola", {"input": 200, "output": 100})):
+            gateway.generate(system="s", user_prompt="u", tier="quality")
+        self.assertEqual(AiUsage.objects.count(), 0)
+
+
+class BudgetGatingTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.org = create_org("BUDGET")  # Business por defecto
+
+    def test_ai_disabled_when_over_budget(self):
+        OrgAiSettings.objects.create(organization=self.org, monthly_budget_usd=Decimal("0.01"))
+        self.assertTrue(services.ai_enabled(self.org))
+        AiUsage.objects.create(organization=self.org, provider="anthropic",
+                               model="claude-opus-4-8", cost_usd=Decimal("0.05"))
+        cache.clear()  # invalida el gasto cacheado del mes
+        self.assertFalse(services.ai_enabled(self.org))
+
+    def test_admin_get_exposes_budget_and_cost(self):
+        c = APIClient()
+        admin = User.objects.create_user("bud_admin", role="ADMIN",
+                                         organization=self.org, is_active=True)
+        c.force_authenticate(admin)
+        r = c.get("/api/admin/ai/settings/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIn("monthly_budget_usd", r.data)
+        self.assertIn("current_month_cost_usd", r.data)

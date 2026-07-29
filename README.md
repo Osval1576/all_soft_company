@@ -139,7 +139,7 @@ celery -A config worker -l info      # Windows dev: --pool=solo
 
 Los canales de entrada (WhatsApp / email / widget / Messenger-IG) se configuran por env y se registran por tenant en `/api/admin/inbound/accounts/` (ver `backend/inbound/README.md`). Sin credenciales de IA, todo **degrada con gracia** (el helpdesk sigue funcionando sin IA).
 
-Cada organización controla su uso de IA en `/api/admin/ai/settings/` (`OrgAiSettings`): **opt-in** (`enabled`) y **rate limits** — acciones de IA autenticadas por usuario/minuto y llamadas de deflección desde canales públicos por org/hora. El tope público protege el endpoint anónimo del widget/WhatsApp (que corre una llamada de IA por consulta) de picos de costo/abuso: superado el límite, la consulta escala a un humano sin gastar IA.
+Cada organización controla su uso de IA en `/api/admin/ai/settings/` (`OrgAiSettings`): **opt-in** (`enabled`), **rate limits** — acciones de IA autenticadas por usuario/minuto y llamadas de deflección desde canales públicos por org/hora — y **presupuesto mensual** (`monthly_budget_usd`). El tope público protege el endpoint anónimo del widget/WhatsApp (que corre una llamada de IA por consulta) de picos de costo/abuso: superado el límite, la consulta escala a un humano sin gastar IA. El costo de cada llamada se registra (`AiUsage`, con precios por proveedor/modelo); al alcanzar el presupuesto del mes, la IA de la org se apaga hasta el mes siguiente (el mismo endpoint devuelve el gasto acumulado en `current_month_cost_usd`). Los precios se pueden ajustar por despliegue con `AI_PRICE_<PROVIDER>_<MODEL>_IN/_OUT`.
 
 ## Roadmap
 
@@ -150,10 +150,9 @@ Cada organización controla su uso de IA en `/api/admin/ai/settings/` (`OrgAiSet
 - [x] Omnicanal: WhatsApp, email-to-ticket, widget web, Messenger/Instagram
 - [x] Multilingüe (traducción con IA)
 - [x] Procesamiento async con cola (Celery + Redis, fallback a thread)
-- [x] Guardrails de IA por tenant: opt-in (`OrgAiSettings`) + rate limiting (costo/abuso)
+- [x] Guardrails de IA por tenant: opt-in (`OrgAiSettings`) + rate limiting + presupuesto mensual con metering de costo (`AiUsage`)
 
 **Pendiente**
-- [ ] Presupuesto mensual de IA por org con metering de costo (AiUsage)
 - [ ] Traducción automática en el pipeline de mensajes (hoy asistida por el agente)
 - [ ] Refinamiento de flujos de agente/administrador
 - [ ] Cobertura de pruebas end-to-end en frontend
