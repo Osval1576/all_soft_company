@@ -7,13 +7,22 @@ from rest_framework.views import APIView
 from tenancy.scoping import org_tickets
 from tickets_t.permissions import can_access_ticket, IsAdmin
 
-from . import services
+from . import ratelimit, services
 from .gateway import AiNotConfigured
 
 _NOT_CONFIGURED = Response(
     {"detail": "El servicio de IA no está configurado. Contactá al administrador."},
     status=status.HTTP_503_SERVICE_UNAVAILABLE,
 )
+
+
+def _rate_limited(org, user):
+    """429 si el usuario superó su tope de acciones de IA por minuto, o None."""
+    if ratelimit.allow_user(org, user.id):
+        return None
+    return Response(
+        {"detail": "Alcanzaste el límite de solicitudes de IA por minuto. Probá de nuevo en un momento."},
+        status=status.HTTP_429_TOO_MANY_REQUESTS)
 
 
 class _BaseTicketAiView(APIView):
@@ -50,6 +59,9 @@ class _BaseTicketAiView(APIView):
         ticket, err = self._resolve(request, ticket_id)
         if err is not None:
             return err
+        limited = _rate_limited(ticket.organization, request.user)
+        if limited is not None:
+            return limited
         try:
             return Response(self.run(ticket))
         except AiNotConfigured:
@@ -93,6 +105,10 @@ class InsightsView(APIView):
                  "upsell": True},
                 status=status.HTTP_403_FORBIDDEN)
 
+        limited = _rate_limited(org, request.user)
+        if limited is not None:
+            return limited
+
         from metrics.services import insights_snapshot, _parse_window
         from sla.calendar_engine import get_calendar
         window = _parse_window(request)
@@ -121,6 +137,9 @@ class TranslateView(APIView):
         if not services.ai_enabled(org):
             return Response({"detail": "La traducción con IA está disponible en los planes Pro y Business.",
                              "upsell": True}, status=status.HTTP_403_FORBIDDEN)
+        limited = _rate_limited(org, user)
+        if limited is not None:
+            return limited
         text = (request.data.get("text") or "").strip()
         target = (request.data.get("target_lang") or "es").strip()
         if not text:

@@ -23,8 +23,8 @@ El objetivo de este roadmap es convertir a AllSafe de "otro helpdesk" en un prod
 Sin esto, ninguna feature es sostenible.
 
 - **Gateway de IA aislado**: un único módulo `ai/` que habla con la API de Claude (mismo patrón que el gateway de Stripe en `billing`: un solo punto, mockeable, testeable).
-- **Config por tenant**: modelo `OrgAiSettings` (opt-in, presupuesto mensual, idioma, tono). Gateado por `billing.effective_plan`.
-- **Guardrails**: límites de tokens, timeout, fallback si la IA falla o el presupuesto se agotó (degradación elegante — el producto sigue funcionando sin IA).
+- **Config por tenant**: modelo `OrgAiSettings` (opt-in + rate limits) ✅ construido (#19). Gateado por `billing.effective_plan`. *Pendiente: presupuesto mensual con metering de costo (AiUsage), idioma y tono.*
+- **Guardrails**: rate limiting por tenant ✅ — tope de acciones de IA autenticadas por usuario/minuto (429) + tope horario de deflección en canales públicos (widget/WhatsApp/DM), que degrada a humano sin gastar IA. Fallback si la IA falla (degradación elegante — el producto sigue funcionando sin IA). *Pendiente: presupuesto/costo por token.*
 - **Prompt-caching** del contexto estático (instrucciones + KB de la org) para bajar costo.
 - **Auditoría/log** de llamadas de IA por org (para costo y debugging), sin filtrar datos entre tenants.
 - **Métrica**: costo/ticket, latencia p95, tasa de error de la IA.
@@ -111,6 +111,7 @@ Sin esto, ninguna feature es sostenible.
 ✅ Fase 0 (gateway) · ✅ Fase 1 (1A borrador + 1B triage) · ✅ Fase 2 (2A resumen + 2B sentimiento) · ✅ Fase 3 (3A KB + 3B deflección RAG) · ✅ Fase 4 (insights) · ✅ **Gateway multi-proveedor** (Claude/Gemini/OpenAI, elegible por despliegue).
 ✅ **Fase 5**: 5.1 omnicanal (WhatsApp #9 · email-to-ticket #13 · widget web #14 · Messenger/Instagram #15) · 5.2 KB auto-alimentada (#10) · 5.3 multilingüe (#11) · 5.4 posicionamiento "IA sin lock-in".
 ✅ **Infra async**: hooks de IA fuera del request (#16) → **cola real Celery** con fallback a thread (#17).
+✅ **Guardrails Fase 0**: `OrgAiSettings` (opt-in por org) + **rate limiting** por tenant — usuario/minuto en las vistas autenticadas (429) y org/hora en la deflección de canales públicos (widget/WhatsApp/DM) para frenar costo/abuso (#19). *Pendiente: presupuesto mensual con metering de costo.*
 
 ---
 

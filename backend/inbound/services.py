@@ -97,11 +97,16 @@ def _try_deflect(org, text):
     el texto de respuesta o None (sin KB / sin plan / la IA no alcanza / falla)."""
     try:
         from ai.services import ai_enabled, answer_from_kb
+        from ai.ratelimit import allow_public
         from kb.search import search_articles
         if not ai_enabled(org):
             return None
         articles = search_articles(org, text)
         if not articles:
+            return None
+        # Guardrail de costo/abuso del canal público (mismo tope que el widget).
+        if not allow_public(org):
+            logger.info("deflección de canal rate-limited para org %s", getattr(org, "id", None))
             return None
         return answer_from_kb(text, articles)
     except Exception:
