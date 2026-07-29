@@ -7,6 +7,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from config.background import run_async
+
 from . import email as email_channel
 from . import messenger
 from . import whatsapp
@@ -14,6 +16,48 @@ from .models import Channel
 from .services import handle_inbound_message
 
 logger = logging.getLogger(__name__)
+
+
+# --- tareas de procesamiento (corren en background; inline bajo tests) --------
+
+def _process_whatsapp(m):
+    try:
+        result = handle_inbound_message(
+            channel=Channel.WHATSAPP, account_external_id=m["account_external_id"],
+            contact_external_id=m["contact_external_id"],
+            contact_name=m["contact_name"], text=m["text"])
+    except Exception:
+        logger.exception("fallo procesando mensaje entrante de WhatsApp")
+        return
+    if result and result.get("reply"):
+        whatsapp.send_message(m["contact_external_id"], result["reply"])
+
+
+def _process_email(m):
+    try:
+        result = handle_inbound_message(
+            channel=Channel.EMAIL, account_external_id=m["account_external_id"],
+            contact_external_id=m["contact_external_id"],
+            contact_name=m["contact_name"], subject=m["subject"], text=m["text"])
+    except Exception:
+        logger.exception("fallo procesando email entrante")
+        return
+    if result and result.get("reply"):
+        subject = m["subject"] or "tu consulta"
+        email_channel.send_reply(m["contact_external_id"], f"Re: {subject}", result["reply"])
+
+
+def _process_messenger(m):
+    try:
+        result = handle_inbound_message(
+            channel=m["channel"], account_external_id=m["account_external_id"],
+            contact_external_id=m["contact_external_id"],
+            contact_name=m["contact_name"], text=m["text"])
+    except Exception:
+        logger.exception("fallo procesando mensaje entrante Messenger/IG")
+        return
+    if result and result.get("reply"):
+        messenger.send_message(m["contact_external_id"], result["reply"])
 
 
 class WhatsAppWebhookView(APIView):
@@ -45,20 +89,10 @@ class WhatsAppWebhookView(APIView):
             return Response({"detail": "payload inválido"}, status=400)
 
         for m in whatsapp.parse_webhook(payload):
-            try:
-                result = handle_inbound_message(
-                    channel=Channel.WHATSAPP,
-                    account_external_id=m["account_external_id"],
-                    contact_external_id=m["contact_external_id"],
-                    contact_name=m["contact_name"],
-                    text=m["text"])
-            except Exception:
-                logger.exception("fallo procesando mensaje entrante de WhatsApp")
-                continue
-            if result and result.get("reply"):
-                whatsapp.send_message(m["contact_external_id"], result["reply"])
+            run_async(_process_whatsapp, m)
 
-        # Meta espera 200 rápido siempre (reintenta ante no-2xx).
+        # Meta espera 200 rápido siempre (reintenta ante no-2xx); el procesamiento
+        # (IA + respuesta) va en background.
         return Response({"status": "ok"})
 
 
@@ -83,22 +117,7 @@ class EmailWebhookView(APIView):
         m = email_channel.parse_inbound(request.data)
         if not m["account_external_id"] or not m["contact_external_id"]:
             return Response({"detail": "faltan from/to"}, status=400)
-
-        try:
-            result = handle_inbound_message(
-                channel=Channel.EMAIL,
-                account_external_id=m["account_external_id"],
-                contact_external_id=m["contact_external_id"],
-                contact_name=m["contact_name"],
-                subject=m["subject"],
-                text=m["text"])
-        except Exception:
-            logger.exception("fallo procesando email entrante")
-            return Response({"status": "error"}, status=200)  # el proveedor no reintenta en loop
-
-        if result and result.get("reply"):
-            subject = m["subject"] or "tu consulta"
-            email_channel.send_reply(m["contact_external_id"], f"Re: {subject}", result["reply"])
+        run_async(_process_email, m)
         return Response({"status": "ok"})
 
 
@@ -131,16 +150,5 @@ class MessengerWebhookView(APIView):
             return Response({"detail": "payload inválido"}, status=400)
 
         for m in messenger.parse_webhook(payload):
-            try:
-                result = handle_inbound_message(
-                    channel=m["channel"],
-                    account_external_id=m["account_external_id"],
-                    contact_external_id=m["contact_external_id"],
-                    contact_name=m["contact_name"],
-                    text=m["text"])
-            except Exception:
-                logger.exception("fallo procesando mensaje entrante Messenger/IG")
-                continue
-            if result and result.get("reply"):
-                messenger.send_message(m["contact_external_id"], result["reply"])
+            run_async(_process_messenger, m)
         return Response({"status": "ok"})

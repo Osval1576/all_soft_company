@@ -79,35 +79,10 @@ class TicketViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             ticket = serializer.save()
             self._emit(ticket, "created", self.request.user)
-        # 1B: auto-triage fuera de la transacción (llamada de red a la IA); su
-        # resultado no debe demorar ni bloquear el commit del ticket.
-        self._maybe_auto_triage(ticket)
-
-    def _maybe_auto_triage(self, ticket):
-        """Sugiere la prioridad con IA al crear (si el plan lo habilita).
-
-        Resiliente por diseño: cualquier fallo del servicio de IA se loguea y se
-        ignora — la creación del ticket nunca depende de la IA.
-        """
-        org = getattr(self.request, "organization", None)
-        try:
-            from ai import services as ai_services
-            if not ai_services.ai_enabled(org):
-                return
-            suggested = ai_services.triage_priority(ticket)
-        except Exception:
-            logger.warning("auto-triage IA falló para ticket %s", ticket.id, exc_info=True)
-            return
-        if not suggested or suggested == ticket.prioridad:
-            return
-        old = ticket.prioridad
-        ticket.prioridad = suggested
-        ticket.save(update_fields=["prioridad"])
-        # Evento auditable, sin notificación (actor de sistema = None).
-        TicketEvent.objects.create(
-            ticket=ticket, kind="priority_changed", actor=None,
-            payload={"from": old, "to": suggested, "auto": True},
-        )
+        # 1B: auto-triage en background (no bloquea la respuesta de creación).
+        from config.background import run_async
+        from .ai_hooks import run_auto_triage
+        run_async(run_auto_triage, ticket.id)
 
     def perform_update(self, serializer):
         inst = serializer.instance
@@ -137,14 +112,12 @@ class TicketViewSet(viewsets.ModelViewSet):
                 self._emit(ticket, "priority_changed", actor, {"from": old["prioridad"], "to": new["prioridad"]})
             became_resolved = old["estado"] != "RESOLVED" and new["estado"] == "RESOLVED"
 
-        # 5.2: al resolver, la IA sugiere un artículo de KB (fuera de la transacción,
-        # resiliente; nunca bloquea el cambio de estado).
+        # 5.2: al resolver, la IA sugiere un artículo de KB en background (no
+        # bloquea el cambio de estado).
         if became_resolved:
-            try:
-                from kb.suggestions import maybe_suggest_from_ticket
-                maybe_suggest_from_ticket(ticket)
-            except Exception:
-                logger.warning("sugerencia de KB falló para ticket %s", ticket.id, exc_info=True)
+            from config.background import run_async
+            from kb.suggestions import run_kb_suggestion
+            run_async(run_kb_suggestion, ticket.id)
 
     # ---- messages (existing) ----
     @action(detail=True, methods=["get"])
@@ -236,10 +209,11 @@ class TicketViewSet(viewsets.ModelViewSet):
         except Exception:
             logger.exception("notification dispatch failed for ticket %s", ticket.id)
 
-        # 2B: escalada por sentimiento (solo si el que adjunta es el cliente).
+        # 2B: escalada por sentimiento en background (solo si el que adjunta es el cliente).
         if _role(request.user) == "CUSTOMER" and caption:
-            from .ai_hooks import apply_sentiment_escalation
-            apply_sentiment_escalation(ticket, caption)
+            from config.background import run_async
+            from .ai_hooks import run_sentiment_escalation
+            run_async(run_sentiment_escalation, ticket.id, caption)
 
         return Response(payload, status=201)
 
