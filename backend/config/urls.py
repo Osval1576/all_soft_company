@@ -25,6 +25,7 @@ from .auth_views import (
 )
 from landing_cms.admin_views import SiteSettingsAdminView
 from tenancy.branding_views import PublicBrandingView
+from inbound.widget_views import widget_script
 
 v_settings_admin = SiteSettingsAdminView.as_view()
 
@@ -54,6 +55,8 @@ urlpatterns = [
     path("api/ai/", include("ai.urls")),
     path("api/kb/", include("kb.urls")),
     path("api/inbound/", include("inbound.urls")),
+    path("api/widget/", include("inbound.widget_urls")),
+    path("widget.js", widget_script, name="widget-js"),
     path("api/branding/", include("tenancy.branding_urls")),
     path("api/public/branding/<str:slug>/", PublicBrandingView.as_view(), name="public-branding"),
     path("api/auth/login-cookie/", LoginCookieView.as_view(), name="login_cookie"),
