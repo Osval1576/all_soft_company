@@ -259,3 +259,24 @@ def suggest_kb_article(ticket):
     if not title:
         return None
     return title, body
+
+
+# --- Fase 5.3: multilingüe (traducción) --------------------------------------
+
+_LANG_NAMES = {
+    "es": "español", "en": "inglés", "pt": "portugués", "fr": "francés",
+    "it": "italiano", "de": "alemán",
+}
+
+
+def translate_text(text, target_lang="es"):
+    """Traduce el texto al idioma destino (código ISO, p. ej. 'es', 'en', 'pt').
+    Devuelve solo la traducción. Puede propagar excepciones del gateway."""
+    from . import gateway
+    target = _LANG_NAMES.get(target_lang, target_lang)
+    system = (
+        f"Sos un traductor profesional. Traducí el texto del usuario al {target}. "
+        "Devolvés SOLO la traducción, sin comillas, prefijos ni notas. Si el texto "
+        "ya está en ese idioma, lo devolvés igual. Conservá el tono."
+    )
+    return (gateway.generate(system=system, user_prompt=text, tier="fast") or "").strip()
