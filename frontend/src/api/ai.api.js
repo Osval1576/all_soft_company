@@ -17,3 +17,9 @@ export async function getInsights(window) {
   const res = await http.post(`/api/ai/insights/?window=${window || 30}`);
   return res.data;
 }
+
+// Fase 5.3 — traducción. Devuelve { translated } o 403 (customer / plan sin IA).
+export async function translate(text, targetLang) {
+  const res = await http.post("/api/ai/translate/", { text, target_lang: targetLang });
+  return res.data;
+}

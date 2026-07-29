@@ -391,3 +391,57 @@ class AiInsightsTests(TestCase):
     def test_not_configured_returns_503(self, mock_gen):
         self.c.force_authenticate(self.admin)
         self.assertEqual(self.c.post(self.URL).status_code, 503)
+
+
+class AiTranslateTests(TestCase):
+    """Fase 5.3 — traducción (multilingüe)."""
+
+    URL = "/api/ai/translate/"
+
+    def setUp(self):
+        self.org = create_org("AITR")  # Business
+        self.agent = User.objects.create_user("tr_agent", role="AGENT",
+                                               organization=self.org, is_active=True)
+        self.customer = User.objects.create_user("tr_cust", role="CUSTOMER",
+                                                  organization=self.org, is_active=True)
+        self.c = APIClient()
+
+    @patch("ai.gateway.generate", return_value="Hello, how can I help you?")
+    def test_agent_translates(self, mock_gen):
+        self.c.force_authenticate(self.agent)
+        r = self.c.post(self.URL, {"text": "Hola, ¿en qué te ayudo?", "target_lang": "en"},
+                        format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.data["translated"], "Hello, how can I help you?")
+        self.assertIn("Hola", mock_gen.call_args.kwargs["user_prompt"])
+
+    @patch("ai.gateway.generate", return_value="x")
+    def test_customer_forbidden(self, mock_gen):
+        self.c.force_authenticate(self.customer)
+        r = self.c.post(self.URL, {"text": "hi"}, format="json")
+        self.assertEqual(r.status_code, 403)
+        mock_gen.assert_not_called()
+
+    @patch("ai.gateway.generate", return_value="x")
+    def test_free_plan_forbidden_with_upsell(self, mock_gen):
+        from billing.models import Plan
+        from billing.testing import seed_plans
+        seed_plans()
+        self.org.subscription.plan = Plan.objects.get(key="free")
+        self.org.subscription.save()
+        self.c.force_authenticate(self.agent)
+        r = self.c.post(self.URL, {"text": "hi"}, format="json")
+        self.assertEqual(r.status_code, 403)
+        self.assertTrue(r.data.get("upsell"))
+        mock_gen.assert_not_called()
+
+    def test_missing_text_400(self):
+        self.c.force_authenticate(self.agent)
+        r = self.c.post(self.URL, {"target_lang": "en"}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    @patch("ai.gateway.generate", side_effect=AiNotConfigured("no key"))
+    def test_not_configured_503(self, mock_gen):
+        self.c.force_authenticate(self.agent)
+        r = self.c.post(self.URL, {"text": "hola", "target_lang": "en"}, format="json")
+        self.assertEqual(r.status_code, 503)

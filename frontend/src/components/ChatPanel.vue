@@ -99,6 +99,20 @@
         aria-label="Resumir el hilo con IA"
       >{{ summarizing ? '…' : '📋' }}</button>
 
+      <select v-if="canDraft" v-model="transLang" class="trans-lang" title="Idioma destino de la traducción">
+        <option value="en">EN</option>
+        <option value="pt">PT</option>
+        <option value="es">ES</option>
+      </select>
+      <button
+        v-if="canDraft"
+        class="ai-btn"
+        :disabled="translating || !draft.trim()"
+        @click="translateDraft"
+        :title="translating ? 'Traduciendo…' : 'Traducir el mensaje del composer'"
+        aria-label="Traducir el mensaje"
+      >{{ translating ? '…' : '🌐' }}</button>
+
       <div class="composer-main">
         <div v-if="pendingFile" class="pending-chip">
           <span class="pending-name">{{ pendingFile.name }}</span>
@@ -128,7 +142,7 @@
 <script setup>
 import { nextTick, ref, watch, computed, onBeforeUnmount } from "vue";
 import { getTicketMessages, getTicketEvents, uploadAttachment } from "../api/tickets.api";
-import { draftReply, summarizeTicket } from "../api/ai.api";
+import { draftReply, summarizeTicket, translate } from "../api/ai.api";
 import { wsHost } from "../api/http";
 import { useAuthStore } from "../stores/auth.store";
 import { useNotificationsStore } from "../stores/notifications.store";
@@ -170,6 +184,8 @@ const canDraft = computed(() => ["AGENT", "ADMIN"].includes(auth.user?.role));
 const drafting = ref(false);
 const summarizing = ref(false);
 const summary = ref("");
+const translating = ref(false);
+const transLang = ref("en");
 
 const canSend = computed(() => {
   if (uploading.value) return false;
@@ -218,6 +234,24 @@ async function suggestSummary() {
   }
 }
 function clearSummary() { summary.value = ""; }
+
+async function translateDraft() {
+  const text = draft.value.trim();
+  if (!text || translating.value) return;
+  translating.value = true;
+  try {
+    const { translated } = await translate(text, transLang.value);
+    if (translated) draft.value = translated;
+  } catch (err) {
+    const data = err?.response?.data;
+    const msg = data?.upsell
+      ? "La traducción con IA está disponible en los planes Pro y Business."
+      : data?.detail || "No se pudo traducir.";
+    notif.pushToast({ title: msg, tone: data?.upsell ? "info" : "error" });
+  } finally {
+    translating.value = false;
+  }
+}
 function onCsatSubmitted(payload) {
   emit("csat-submitted", payload);
 }
@@ -477,6 +511,18 @@ onBeforeUnmount(() => notif.setActiveTicket(null));
 }
 .ai-btn:hover:not(:disabled) { background: var(--border); }
 .ai-btn:disabled { opacity: .4; cursor: not-allowed; }
+.trans-lang {
+  flex-shrink: 0;
+  height: 38px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 0 4px;
+  cursor: pointer;
+}
 .composer-main { flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .pending-chip {
   display: inline-flex; align-items: center; gap: 8px;

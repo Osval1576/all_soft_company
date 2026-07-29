@@ -102,3 +102,31 @@ class InsightsView(APIView):
         except AiNotConfigured:
             return _NOT_CONFIGURED
         return Response({"insights": text, "snapshot": snapshot})
+
+
+class TranslateView(APIView):
+    """POST /api/ai/translate/ {"text": "...", "target_lang": "es"} -> {"translated"}
+
+    Traducción para el agente (multilingüe, Fase 5.3): traducir el mensaje del
+    cliente al español, o su respuesta al idioma del cliente. AGENT/ADMIN + plan.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        org = getattr(request, "organization", None) or getattr(user, "organization", None)
+        if getattr(user, "role", None) not in ("AGENT", "ADMIN"):
+            return Response({"detail": "Solo agentes o administradores pueden usar la IA."},
+                            status=status.HTTP_403_FORBIDDEN)
+        if not services.ai_enabled(org):
+            return Response({"detail": "La traducción con IA está disponible en los planes Pro y Business.",
+                             "upsell": True}, status=status.HTTP_403_FORBIDDEN)
+        text = (request.data.get("text") or "").strip()
+        target = (request.data.get("target_lang") or "es").strip()
+        if not text:
+            return Response({"detail": "Falta el texto."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            translated = services.translate_text(text, target)
+        except AiNotConfigured:
+            return _NOT_CONFIGURED
+        return Response({"translated": translated})
