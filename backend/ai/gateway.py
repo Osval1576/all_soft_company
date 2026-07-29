@@ -49,8 +49,14 @@ def _model_for(provider, tier):
     return os.environ.get(env_key) or _MODEL_DEFAULTS.get(provider, {}).get(tier)
 
 
-def generate(*, system, user_prompt, tier="quality", max_tokens=1024):
+def generate(*, system, user_prompt, tier="quality", max_tokens=1024,
+             org=None, source=""):
     """Una sola llamada al LLM del proveedor configurado. Devuelve texto plano.
+
+    Si se pasa `org`, mide el costo de la llamada (metering.record) — único punto
+    donde se conocen proveedor, modelo, tokens y org a la vez. `source` etiqueta
+    la feature (draft/triage/deflect/...). Los adapters devuelven (texto, usage);
+    el metering es resiliente (no rompe la llamada si falla).
 
     Levanta AiNotConfigured si falta la key del proveedor. Cualquier otro error
     del proveedor se propaga (el llamador decide el fallback).
@@ -58,15 +64,22 @@ def generate(*, system, user_prompt, tier="quality", max_tokens=1024):
     provider = _provider()
     model = _model_for(provider, tier)
     if provider == "anthropic":
-        return _anthropic(system, user_prompt, model, max_tokens)
-    if provider == "gemini":
-        return _gemini(system, user_prompt, model, max_tokens)
-    if provider == "openai":
-        return _openai(system, user_prompt, model, max_tokens)
-    raise AiNotConfigured(f"AI_PROVIDER desconocido: {provider!r}")
+        text, usage = _anthropic(system, user_prompt, model, max_tokens)
+    elif provider == "gemini":
+        text, usage = _gemini(system, user_prompt, model, max_tokens)
+    elif provider == "openai":
+        text, usage = _openai(system, user_prompt, model, max_tokens)
+    else:
+        raise AiNotConfigured(f"AI_PROVIDER desconocido: {provider!r}")
+    if org is not None:
+        from . import metering
+        metering.record(org, provider=provider, model=model, tier=tier,
+                        source=source, usage=usage)
+    return text
 
 
 # --- Adapters --------------------------------------------------------------
+# Cada adapter devuelve (texto, usage) donde usage = {"input", "output"} o None.
 
 def _anthropic(system, user_prompt, model, max_tokens):
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -81,7 +94,11 @@ def _anthropic(system, user_prompt, model, max_tokens):
         system=system,
         messages=[{"role": "user", "content": user_prompt}],
     )
-    return "".join(b.text for b in resp.content if b.type == "text").strip()
+    text = "".join(b.text for b in resp.content if b.type == "text").strip()
+    u = getattr(resp, "usage", None)
+    usage = {"input": getattr(u, "input_tokens", 0),
+             "output": getattr(u, "output_tokens", 0)} if u else None
+    return text, usage
 
 
 def _gemini(system, user_prompt, model, max_tokens):
@@ -108,7 +125,15 @@ def _gemini(system, user_prompt, model, max_tokens):
         text = resp.text
     except Exception:
         text = None
-    return (text or "").strip()
+    m = getattr(resp, "usage_metadata", None)
+    if m:
+        # El razonamiento (thoughts) también es salida facturada.
+        out = (getattr(m, "candidates_token_count", 0) or 0) + \
+              (getattr(m, "thoughts_token_count", 0) or 0)
+        usage = {"input": getattr(m, "prompt_token_count", 0) or 0, "output": out}
+    else:
+        usage = None
+    return (text or "").strip(), usage
 
 
 def _openai(system, user_prompt, model, max_tokens):
@@ -128,4 +153,8 @@ def _openai(system, user_prompt, model, max_tokens):
             {"role": "user", "content": user_prompt},
         ],
     )
-    return (resp.choices[0].message.content or "").strip()
+    text = (resp.choices[0].message.content or "").strip()
+    u = getattr(resp, "usage", None)
+    usage = {"input": getattr(u, "prompt_tokens", 0),
+             "output": getattr(u, "completion_tokens", 0)} if u else None
+    return text, usage

@@ -22,7 +22,10 @@ def ai_enabled(org):
     if sub.effective_plan.key not in ("pro", "business"):
         return False
     from .models import OrgAiSettings
-    return OrgAiSettings.get_for(org).enabled
+    if not OrgAiSettings.get_for(org).enabled:
+        return False
+    from . import metering
+    return not metering.over_budget(org)
 
 
 def build_draft_prompt(ticket):
@@ -54,7 +57,8 @@ def draft_reply(ticket):
     """Genera un borrador de respuesta para el ticket (llama al gateway de IA)."""
     from . import gateway
     system, user_prompt = build_draft_prompt(ticket)
-    return gateway.generate(system=system, user_prompt=user_prompt, tier="quality")
+    return gateway.generate(system=system, user_prompt=user_prompt, tier="quality",
+                            org=ticket.organization, source="draft")
 
 
 # --- Fase 2A: resumen de conversación ----------------------------------------
@@ -88,7 +92,8 @@ def summarize_ticket(ticket):
     """Genera un resumen del hilo del ticket (llama al gateway de IA)."""
     from . import gateway
     system, user_prompt = build_summary_prompt(ticket)
-    return gateway.generate(system=system, user_prompt=user_prompt, tier="quality")
+    return gateway.generate(system=system, user_prompt=user_prompt, tier="quality",
+                            org=ticket.organization, source="summary")
 
 
 # --- Fase 1B: auto-triage de prioridad ---------------------------------------
@@ -121,7 +126,8 @@ def triage_priority(ticket):
     """
     from . import gateway
     system, user_prompt = build_triage_prompt(ticket)
-    raw = gateway.generate(system=system, user_prompt=user_prompt, max_tokens=8, tier="fast")
+    raw = gateway.generate(system=system, user_prompt=user_prompt, max_tokens=8,
+                           tier="fast", org=ticket.organization, source="triage")
     val = (raw or "").strip().upper()
     return val if val in VALID_PRIORITIES else None
 
@@ -151,7 +157,8 @@ def assess_sentiment_priority(ticket, message_text):
     None si la respuesta no es válida. Puede propagar excepciones del gateway."""
     from . import gateway
     system, user_prompt = build_sentiment_prompt(ticket, message_text)
-    raw = gateway.generate(system=system, user_prompt=user_prompt, max_tokens=8, tier="fast")
+    raw = gateway.generate(system=system, user_prompt=user_prompt, max_tokens=8,
+                           tier="fast", org=ticket.organization, source="sentiment")
     val = (raw or "").strip().upper()
     return val if val in VALID_PRIORITIES else None
 
@@ -181,13 +188,14 @@ def build_deflection_prompt(query, articles):
     return system, user_prompt
 
 
-def answer_from_kb(query, articles):
+def answer_from_kb(query, articles, org=None):
     """Genera una respuesta a partir de los artículos. Devuelve el texto, o None
     si el modelo indica que la KB no alcanza (sentinela NO_SE). Puede propagar
     excepciones del gateway: el llamador decide la degradación."""
     from . import gateway
     system, user_prompt = build_deflection_prompt(query, articles)
-    raw = gateway.generate(system=system, user_prompt=user_prompt, tier="quality")
+    raw = gateway.generate(system=system, user_prompt=user_prompt, tier="quality",
+                           org=org, source="deflect")
     text = (raw or "").strip()
     if not text or text.upper().startswith(NO_ANSWER):
         return None
@@ -216,12 +224,13 @@ def build_insights_prompt(snapshot):
     return system, user_prompt
 
 
-def generate_insights(snapshot):
+def generate_insights(snapshot, org=None):
     """Genera el análisis ejecutivo a partir del snapshot. Puede propagar
     excepciones del gateway (el llamador decide el fallback)."""
     from . import gateway
     system, user_prompt = build_insights_prompt(snapshot)
-    return gateway.generate(system=system, user_prompt=user_prompt, max_tokens=1024, tier="quality")
+    return gateway.generate(system=system, user_prompt=user_prompt, max_tokens=1024,
+                            tier="quality", org=org, source="insights")
 
 
 # --- Fase 5.2: KB auto-alimentada (sugerencia desde ticket resuelto) ----------
@@ -257,7 +266,8 @@ def suggest_kb_article(ticket):
     respuesta viene vacía. Puede propagar excepciones del gateway."""
     from . import gateway
     system, user_prompt = build_kb_suggestion_prompt(ticket)
-    raw = (gateway.generate(system=system, user_prompt=user_prompt, tier="quality") or "").strip()
+    raw = (gateway.generate(system=system, user_prompt=user_prompt, tier="quality",
+                            org=ticket.organization, source="kb_suggest") or "").strip()
     if not raw:
         return None
     parts = raw.split("\n", 1)
@@ -276,7 +286,7 @@ _LANG_NAMES = {
 }
 
 
-def translate_text(text, target_lang="es"):
+def translate_text(text, target_lang="es", org=None):
     """Traduce el texto al idioma destino (código ISO, p. ej. 'es', 'en', 'pt').
     Devuelve solo la traducción. Puede propagar excepciones del gateway."""
     from . import gateway
@@ -286,4 +296,5 @@ def translate_text(text, target_lang="es"):
         "Devolvés SOLO la traducción, sin comillas, prefijos ni notas. Si el texto "
         "ya está en ese idioma, lo devolvés igual. Conservá el tono."
     )
-    return (gateway.generate(system=system, user_prompt=text, tier="fast") or "").strip()
+    return (gateway.generate(system=system, user_prompt=text, tier="fast",
+                             org=org, source="translate") or "").strip()

@@ -34,7 +34,7 @@ def run_deflection(org, query):
         return payload(available=True)
 
     try:
-        answer = answer_from_kb(query, articles)
+        answer = answer_from_kb(query, articles, org=org)
     except Exception:
         logger.warning("deflección IA falló para org %s", getattr(org, "id", None), exc_info=True)
         return payload(available=True)

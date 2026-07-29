@@ -114,7 +114,7 @@ class InsightsView(APIView):
         window = _parse_window(request)
         snapshot = insights_snapshot(org, window, get_calendar(org))
         try:
-            text = services.generate_insights(snapshot)
+            text = services.generate_insights(snapshot, org=org)
         except AiNotConfigured:
             return _NOT_CONFIGURED
         return Response({"insights": text, "snapshot": snapshot})
@@ -145,7 +145,7 @@ class TranslateView(APIView):
         if not text:
             return Response({"detail": "Falta el texto."}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            translated = services.translate_text(text, target)
+            translated = services.translate_text(text, target, org=org)
         except AiNotConfigured:
             return _NOT_CONFIGURED
         return Response({"translated": translated})
