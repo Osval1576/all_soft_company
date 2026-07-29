@@ -178,9 +178,19 @@ MEDIA_ROOT = BASE_DIR / "media"
 # Flag global de features de IA. En prod requiere además la key del proveedor.
 AI_FEATURES_ENABLED = _env_bool("AI_FEATURES_ENABLED", DEBUG)
 # Hooks de IA fire-and-forget (triage 1B, sentimiento 2B, sugerencia de KB 5.2,
-# ingesta omnicanal) en background (thread daemon) para no bloquear el request/
-# webhook. Bajo tests corre inline (False) para que los asserts síncronos valgan.
+# ingesta omnicanal) fuera del request. Bajo tests corre inline (False) para que
+# los asserts síncronos valgan.
 AI_ASYNC = _env_bool("AI_ASYNC", not _TESTING)
+# Backend de tareas: "celery" para usar la cola real (worker aparte); vacío ->
+# thread daemon in-process (dev/single-process).
+AI_TASK_QUEUE = _env("AI_TASK_QUEUE", "")
+# Celery: broker por defecto el mismo Redis que Channels/cache. Sin resultado
+# (las tasks son fire-and-forget). Worker: `celery -A config worker -l info`.
+CELERY_BROKER_URL = _env("CELERY_BROKER_URL", REDIS_URL or "redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = None
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_DEFAULT_QUEUE = _env("CELERY_TASK_DEFAULT_QUEUE", "allsafe")
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 # Proveedor de IA elegido por el despliegue: "anthropic" (Claude), "gemini"
 # (Google) u "openai" (ChatGPT). El gateway (ai/gateway.py) enruta según esto y
 # lee la key correspondiente del entorno (ANTHROPIC_API_KEY / GEMINI_API_KEY /
