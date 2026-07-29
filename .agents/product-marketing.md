@@ -48,8 +48,9 @@
 
 ## Differentiation
 **Key differentiators:**
-- **AI-native desde el modelo de datos** (no un add-on): auto-triage, borradores de respuesta, resúmenes, deflección.
-- **Español-first + LATAM**: idioma, precio local, y (roadmap) **WhatsApp como canal nativo**.
+- **AI-native desde el modelo de datos** (no un add-on): auto-triage, borradores de respuesta, resúmenes, sentimiento→prioridad, deflección RAG sobre KB, insights, y KB que se auto-alimenta.
+- **IA sin lock-in (BYO-AI)** ⭐: el cliente elige el proveedor de IA — **Claude, Gemini o ChatGPT** — y trae su propia API key. Controla su costo de IA y no queda encerrado. Los incumbentes empaquetan la IA con markup o te atan a su proveedor; acá es transparente y elegible por despliegue.
+- **Español-first + LATAM**: idioma, precio local, **WhatsApp como canal nativo** (omnicanal) y **multilingüe** (traducción para atender en inglés/portugués sin equipo bilingüe).
 - **White-label de fábrica**: branding por tenant + multi-tenant + billing → ideal para agencias/MSPs.
 - Base moderna y segura: real-time (WebSockets), motor de SLA, CSAT, métricas, auditado (OWASP/CWE).
 **How we do it differently:** en vez de competir por paridad de features contra gigantes, clavamos un wedge (IA + español + white-label) donde son caros/lentos/en inglés.
@@ -61,8 +62,9 @@
 |-----------|----------|
 | "¿Por qué no Zendesk?" | Zendesk es caro, en inglés y sobredimensionado para una PyME; AllSafe es español-first, con IA incluida y precio local |
 | "¿La IA es confiable?" | La IA asiste (borradores/triage), el agente siempre decide; con guardrails y opt-in por org |
+| "¿Me obligan a usar una IA cara / que no elijo?" | No: elegís el proveedor (Claude/Gemini/ChatGPT) y traés tu propia key — controlás el costo y no hay lock-in (BYO-AI) |
 | "¿Mis datos están seguros / aislados?" | Multi-tenant con aislamiento verificado + auditoría de seguridad (OWASP/CWE) |
-| "Ya uso WhatsApp" | Justamente: (roadmap) integramos WhatsApp como canal de tickets, sumando SLA y métricas que WhatsApp no da |
+| "Ya uso WhatsApp" | Justamente: integramos WhatsApp como canal de tickets (con deflección IA), sumando SLA y métricas que WhatsApp no da |
 
 **Anti-persona:** enterprise grande con necesidades de compliance pesado (SOC2/on-prem) y decenas de integraciones — hoy no es el fit; el fit es PyME/agencia ágil.
 
@@ -80,7 +82,7 @@
 - "Zendesk es un montón para lo que necesito."
 **How they describe us:**
 - "Es como Zendesk pero en español y con IA, y me sale bien de precio."
-**Words to use:** mesa de ayuda, soporte, tickets, SLA, en español, tu marca, con IA, WhatsApp.
+**Words to use:** mesa de ayuda, soporte, tickets, SLA, en español, tu marca, con IA, WhatsApp, tu propia IA / sin lock-in, controlás el costo.
 **Words to avoid:** jerga enterprise ("ITSM", "omnichannel orchestration"), términos que suenen caros/complejos.
 **Glossary:**
 | Term | Meaning |
@@ -103,8 +105,9 @@
 **Value themes:**
 | Theme | Proof |
 |-------|-------|
-| AI-native | (roadmap) auto-triage/draft/resumen sobre el propio modelo de datos |
-| Español + LATAM | producto íntegramente en español; (roadmap) WhatsApp |
+| AI-native | auto-triage/draft/resumen/sentimiento/deflección RAG/insights + KB auto-alimentada, sobre el propio modelo de datos |
+| IA sin lock-in (BYO-AI) | gateway multi-proveedor (Claude/Gemini/OpenAI) elegible por env; el cliente trae su key |
+| Español + LATAM | producto íntegramente en español; WhatsApp omnicanal + traducción multilingüe |
 | White-label | branding por tenant + multi-tenant + billing ya funcionando |
 | Base sólida/segura | auditoría de seguridad + suite de tests + real-time |
 
