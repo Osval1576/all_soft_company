@@ -65,6 +65,17 @@ responde con la KB publicada, y si no alcanza deja su email → se crea un ticke
    ticket): `POST /api/widget/<key>/ask/` (deflección) y
    `POST /api/widget/<key>/contact/` (crea el ticket con el email del visitante).
 
+## Configurar Messenger / Instagram (Meta Graph)
+Ambos comparten webhook (`/api/inbound/messenger/`) y adapter; se distinguen por
+el `object` del payload (`page` → Messenger, `instagram` → Instagram DM).
+1. En Meta: app con Messenger/Instagram, page access token y app secret.
+2. Env: `MESSENGER_VERIFY_TOKEN`, `MESSENGER_TOKEN`, `MESSENGER_APP_SECRET`.
+3. Webhook a `https://TU_DOMINIO/api/inbound/messenger/` (verificación por GET),
+   suscribiendo el objeto `page` y/o `instagram`.
+4. Registrá la cuenta del tenant: `POST /api/admin/inbound/accounts/`
+   `{ "channel": "messenger"|"instagram", "external_id": "<page_id / ig_id>" }`
+   (se resuelve por el `recipient.id` del evento).
+
 ## Notas / siguientes pasos
 - El procesamiento es inline en el webhook (la llamada de IA suma latencia). Para
   volumen alto conviene una cola/worker (deja el 200 inmediato y procesa aparte).
