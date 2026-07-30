@@ -7,7 +7,10 @@
           <p class="eyebrow">Contenido</p>
           <h1 class="title">Base de conocimiento</h1>
         </div>
-        <button class="btn-new" @click="startNew">+ Nuevo artículo</button>
+        <div class="head-actions">
+          <router-link to="/admin/kb/sugerencias" class="btn-ghost">Sugerencias de IA</router-link>
+          <button class="btn-new" @click="startNew">+ Nuevo artículo</button>
+        </div>
       </header>
 
       <div v-if="loading" class="state">Cargando…</div>
@@ -202,6 +205,9 @@ onMounted(load);
   white-space: nowrap; transition: background .15s;
 }
 .btn-new:hover { background: var(--accent-hover); }
+.head-actions { display: flex; align-items: center; gap: 10px; }
+.btn-ghost { padding: 9px 14px; border-radius: var(--r-sm); border: 0.5px solid var(--border); color: var(--text-2); font-size: 13px; white-space: nowrap; }
+.btn-ghost:hover { background: var(--surface-2); }
 
 .layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; align-items: start; }
 @media (max-width: 720px) { .layout { grid-template-columns: 1fr; } }

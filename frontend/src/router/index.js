@@ -25,6 +25,7 @@ import AdminMembers from "../views/dashboards/AdminMembers.vue";
 import AdminSubscription from "../views/dashboards/AdminSubscription.vue";
 import AdminBranding from "../views/dashboards/AdminBranding.vue";
 import AdminKb from "../views/admin/kb/AdminKb.vue";
+import AdminKbSuggestions from "../views/admin/kb/AdminKbSuggestions.vue";
 import AdminAiSettings from "../views/admin/ai/AdminAiSettings.vue";
 import NotificationSettings from "../views/settings/NotificationSettings.vue";
 
@@ -55,6 +56,7 @@ const routes = [
   { path: "/admin/suscripcion", name: "admin-suscripcion", component: AdminSubscription, meta: { role: "ADMIN" } },
   { path: "/admin/branding", name: "admin-branding", component: AdminBranding, meta: { role: "ADMIN" } },
   { path: "/admin/kb", name: "admin-kb", component: AdminKb, meta: { role: "ADMIN" } },
+  { path: "/admin/kb/sugerencias", name: "admin-kb-suggestions", component: AdminKbSuggestions, meta: { role: "ADMIN" } },
   { path: "/admin/ia", name: "admin-ai", component: AdminAiSettings, meta: { role: "ADMIN" } },
   { path: "/ajustes/notificaciones", name: "notif-settings", component: NotificationSettings, meta: { authed: true } },
   {
