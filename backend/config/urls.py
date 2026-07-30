@@ -19,6 +19,9 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
+from drf_spectacular.views import (
+    SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView,
+)
 from .views import me, health, csrf
 from .auth_views import (
     LoginCookieView, RefreshCookieView, LogoutView, ThrottledTokenObtainPairView,
@@ -38,6 +41,11 @@ urlpatterns = [
 
     path("api/me/", me, name="me"),
     path("api/health/", health, name="health"),
+
+    # Documentación de API: esquema OpenAPI 3 + UIs Swagger y Redoc.
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
 
     path("api/users/", include("users.urls")),
     path("api/invitations/", include("accounts.invitation_urls")),

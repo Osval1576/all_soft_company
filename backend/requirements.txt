@@ -16,6 +16,8 @@ redis==6.4.0
 # Opcional: sin AI_TASK_QUEUE=celery, el proyecto usa un thread daemon in-process.
 celery[redis]
 stripe==15.3.1
+# Documentación de API: esquema OpenAPI 3 auto-generado + Swagger/Redoc UI.
+drf-spectacular==0.28.0
 # Proveedores de IA (multi-proveedor por AI_PROVIDER; import perezoso en el
 # gateway: solo hace falta el SDK del proveedor elegido en el despliegue).
 anthropic
