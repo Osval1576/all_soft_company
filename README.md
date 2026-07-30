@@ -119,6 +119,7 @@ docker compose up --build
 - Backend (API): `http://localhost:8000`
 - Healthcheck: `http://localhost:8000/api/health/`
 - Frontend (vía Nginx): `http://localhost`
+- **Documentación de API (Swagger)**: `http://localhost:8000/api/docs/` · Redoc: `http://localhost:8000/api/redoc/` · esquema OpenAPI 3: `http://localhost:8000/api/schema/`
 
 `docker compose up` levanta todos los servicios: `web` (API/ASGI), `worker` (Celery — procesa los hooks de IA async), `scheduler` y `trial-scheduler` (loops de SLA y periodos de prueba), `mysql`, `redis` y `nginx`. El `web` aplica las migraciones al arrancar; el resto espera a que esté sano.
 
@@ -153,12 +154,13 @@ Cada organización controla su uso de IA en `/api/admin/ai/settings/` (`OrgAiSet
 - [x] Multilingüe (traducción con IA)
 - [x] Procesamiento async con cola (Celery + Redis, fallback a thread)
 - [x] Guardrails de IA por tenant: opt-in (`OrgAiSettings`) + rate limiting + presupuesto mensual con metering de costo (`AiUsage`)
+- [x] Documentación de API (OpenAPI 3 con drf-spectacular: Swagger `/api/docs/`, Redoc `/api/redoc/`)
+- [x] Tests de componentes de frontend (Vitest + happy-dom: paneles admin + wedge de IA del ChatPanel)
 
 **Pendiente**
 - [ ] Traducción automática en el pipeline de mensajes (hoy asistida por el agente)
 - [ ] Refinamiento de flujos de agente/administrador
-- [ ] Cobertura de pruebas end-to-end en frontend
-- [ ] Documentación de API
+- [ ] Cobertura de pruebas end-to-end en frontend (flujo completo con navegador)
 
 ## Autor
 

@@ -52,6 +52,7 @@ INSTALLED_APPS = [
 
     # Third-party
     "rest_framework",
+    "drf_spectacular",
     "corsheaders",
     "tenancy",
     "accounts",
@@ -244,6 +245,31 @@ REST_FRAMEWORK = {
     # Nginx antepone la IP real como último elemento). En dev sin proxy no hay
     # XFF y DRF cae a REMOTE_ADDR. Ajustable si hay más/menos proxies.
     "NUM_PROXIES": int(_env("NUM_PROXIES", "1")),
+    # Esquema OpenAPI 3 generado por drf-spectacular (ver SPECTACULAR_SETTINGS).
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+# -----------------------
+# Documentación de API (OpenAPI 3 / Swagger / Redoc)
+# -----------------------
+SPECTACULAR_SETTINGS = {
+    "TITLE": "AllSafe API",
+    "DESCRIPTION": (
+        "API de la mesa de ayuda multi-tenant AllSafe: tickets y chat en tiempo "
+        "real, SLA, CSAT, facturación (Stripe), wedge de IA (borrador/triage/"
+        "resumen/deflección/insights), base de conocimiento y omnicanal. "
+        "Autenticación por JWT en cookie (login en /api/auth/login/)."
+    ),
+    "VERSION": "1.0.0",
+    # No servir el esquema crudo dentro del Swagger UI (se sirve en /api/schema/).
+    "SERVE_INCLUDE_SCHEMA": False,
+    # En dev el UI/esquema es público; en prod requiere estar autenticado para no
+    # exponer el mapa de endpoints. Ajustable por despliegue.
+    "SERVE_PERMISSIONS": (
+        ["rest_framework.permissions.AllowAny"] if DEBUG
+        else ["rest_framework.permissions.IsAuthenticated"]
+    ),
+    "SCHEMA_PATH_PREFIX": "/api",
 }
 
 # Cache (presence de notificaciones). LocMem en dev; Redis si REDIS_URL está seteado (G).
