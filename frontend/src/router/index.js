@@ -27,6 +27,7 @@ import AdminBranding from "../views/dashboards/AdminBranding.vue";
 import AdminKb from "../views/admin/kb/AdminKb.vue";
 import AdminKbSuggestions from "../views/admin/kb/AdminKbSuggestions.vue";
 import AdminAiSettings from "../views/admin/ai/AdminAiSettings.vue";
+import AdminChannels from "../views/admin/inbound/AdminChannels.vue";
 import NotificationSettings from "../views/settings/NotificationSettings.vue";
 
 import { useAuthStore } from "../stores/auth.store";
@@ -58,6 +59,7 @@ const routes = [
   { path: "/admin/kb", name: "admin-kb", component: AdminKb, meta: { role: "ADMIN" } },
   { path: "/admin/kb/sugerencias", name: "admin-kb-suggestions", component: AdminKbSuggestions, meta: { role: "ADMIN" } },
   { path: "/admin/ia", name: "admin-ai", component: AdminAiSettings, meta: { role: "ADMIN" } },
+  { path: "/admin/canales", name: "admin-channels", component: AdminChannels, meta: { role: "ADMIN" } },
   { path: "/ajustes/notificaciones", name: "notif-settings", component: NotificationSettings, meta: { authed: true } },
   {
     path: "/admin/sitio",

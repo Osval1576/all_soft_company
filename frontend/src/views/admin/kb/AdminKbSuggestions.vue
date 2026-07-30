@@ -42,7 +42,7 @@
                 class="btn-dismiss"
                 :class="{ 'btn-dismiss--confirm': confirmingId === s.id }"
                 :disabled="busyId === s.id"
-                @click="onDismiss(s)"
+                @click.stop="onDismiss(s)"
               >{{ confirmingId === s.id ? "¿Descartar?" : "Descartar" }}</button>
             </div>
           </li>
